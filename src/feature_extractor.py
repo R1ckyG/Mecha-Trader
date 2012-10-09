@@ -115,16 +115,17 @@ def get_features_from_vectors(data_vectors):
 
 snp_vector = None
 def find_bxret(data, snp_vector, vector, index):
-  roc_vector = tl.ROC(vector, timeperiod=28)
-  snp_roc = tl.ROC(snp_vector, timeperiod=28)
-  beta = tl.BETA(roc_vector, snp_roc, timeperiod=28)
+  roc_vector = tl.ROC(vector, timeperiod=14)
+  snp_roc = tl.ROC(snp_vector, timeperiod=14)
+  beta = tl.BETA(roc_vector, snp_roc, timeperiod=14)
   expected_return = beta[index] * (snp_roc[index] - RISK_FREE)
+  excess = beta[index] * (snp_roc[index] - RISK_FREE) + RISK_FREE
   #print 'stock roc: %f, SnP roc: %f, beta: %f, exp-ret.: %f' %\
   #(roc_vector[index], snp_roc[index], beta[index], RISK_FREE + beta[index] * (snp_roc[index] - RISK_FREE))
   if expected_return > 0:
-    return 1
+    return 1, excess
   else:
-    return -1
+    return -1, excess
   
 def combine(data, vectors, features):
   print len(data), len(vectors['close'])
@@ -144,7 +145,9 @@ def combine(data, vectors, features):
   print len(data) == len(snp_vector), len(data), len(snp_vector)
   for i in range(len(data)):
     complete_datum = complete_datapoint(data[i], features, i)
-    complete_datum['bxret'] = find_bxret(data, snp_vector, vectors['adj_close'], i)
+    bx, excess = find_bxret(data, snp_vector, vectors['adj_close'], i)
+    complete_datum['bxret'] = bx
+    complete_datum['excess'] = excess
     results.append(complete_datum)
   return results
 

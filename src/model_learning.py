@@ -22,12 +22,20 @@ def get_data_sets(data, labels):
       % (partition_index, data_length - partition_index)
   return data[:partition_index], data[partition_index:], labels[:partition_index], labels[partition_index:]
 
+
+def get_data(data, labels):
+  x_train, x_test, y_train, y_test = get_data_sets(data, labels)
+  train = dv().fit_transform(x_test)
+  test = np.array(y_test)
+  
+  return train.todense(), test
+
 def get_best_model_params(model, data, labels):
   x_train, x_test, y_train, y_test = get_data_sets(data, labels)
   train = dv().fit_transform(x_train)
   test = np.array(y_train)
-  hyper_parameters = [{'learn_rate':[.1, .2, .4, .8, 1], 'n_estimators': [200, 400, 800, 1600, 3200],
-                       'max_depth': [3, 6, 9], 'subsample':[.5, 1.0, 1.5], 'max_features': [7, 14, 28]}]
+  hyper_parameters = [{'learn_rate':[.1], 'n_estimators': [800],
+                       'max_depth': [6], 'subsample':[1.0], 'max_features': [ 14]}]
   clf = gs(model, hyper_parameters)  
   clf.fit(train.todense(), test)
   
@@ -35,6 +43,11 @@ def get_best_model_params(model, data, labels):
   print
   print clf.best_estimator_
   
-  for params, mean_score, scores in clf.grid_scores_:
-    print "%0.3f (+/-%0.03f) for %r" % (mean_score, scores.std() / 2, params)
+  #for params, mean_score, scores in clf.grid_scores_:
+  #  print "%0.3f (+/-%0.03f) for %r" % (mean_score, scores.std() / 2, params)
+    
+  train = dv().fit_transform(x_test)
+  test = np.array(y_test)
+  #print clf.score(train.todense(), test)
+  return clf
 
