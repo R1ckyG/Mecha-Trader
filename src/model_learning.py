@@ -3,6 +3,7 @@ import feature_extractor as fe
 from sklearn.feature_extraction import DictVectorizer as dv
 import numpy as np
 from sklearn.grid_search import GridSearchCV as gs
+from sklearn.ensemble import GradientBoostingClassifier as gc
 
 def get_clean_data(ticker):
   clean_data = list()
@@ -14,6 +15,15 @@ def get_clean_data(ticker):
     labels.append(d.pop('bxret'))
     clean_data.append(d)
   return clean_data[31:], labels[31:]
+
+def get_data_for_multiple(tickers):
+  clean_data = list()
+  clean_labels = list()
+  for ticker in tickers:
+    data, labels = fe.get_clean_data(ticker)
+    clean_data.extend(data)
+    clean_labels.extend(labels)
+  return clean_data, clean_lables
 
 def get_data_sets(data, labels):
   data_length = len(data)
@@ -51,3 +61,12 @@ def get_best_model_params(model, data, labels):
   #print clf.score(train.todense(), test)
   return clf
 
+if __name__ == '__main__':
+  d = l = None
+  if len(sys.argv) > 2:
+    d, l = get_clean_dats(sys.argv[1])
+  else:
+    d, l = get_clean_data('YHOO')
+    c = get_best_model_params(gc(), d, l)
+    features, test = get_data(d, l)
+    print c.score(features, test)
