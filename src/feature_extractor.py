@@ -69,7 +69,19 @@ def get_feature_from_vector(vector):
                                    nbdevdn=2, matype=tl.MA_SMA)
   feature_dict['bbands_32_upper'] = upper
   feature_dict['bbands_32_lower'] = lower
-
+  feature_dict['momentum_12'] = tl.MOM(vector, timeperiod=12)
+  feature_dict['momentum_18'] = tl.MOM(vector, timeperiod=18)
+  feature_dict['momentum_24'] = tl.MOM(vector, timeperiod=24)
+  
+  ema = tl.EMA(feature_dict['momentum_12'], timeperiod=2)
+  feature_dict['momentum_to_ema_12'] = np.divide(feature_dict['momentum_12'], ema) 
+  feature_dict['ema_to_mom_12'] = ema
+  ema = tl.EMA(feature_dict['momentum_18'], timeperiod=2)
+  feature_dict['momentum_to_ema_18'] = np.divide(feature_dict['momentum_18'], ema) 
+  feature_dict['ema_to_mom_18'] = ema
+  ema = tl.EMA(feature_dict['momentum_24'], timeperiod=2)
+  feature_dict['momentum_to_ema_24'] = np.divide(feature_dict['momentum_24'], ema) 
+  feature_dict['ema_to_mom_24'] = ema
   return feature_dict
 
 def apply_bollinger_rule(close_prices, features):
@@ -88,10 +100,31 @@ def apply_bollinger_rule(close_prices, features):
       rule_array.append('hold')
   return rule_array
 
+def apply_momentum_rule(features, days=24):
+  rule_array = []
+  ratio_key = 'ema_to_mom_%d' % days
+  momentum_key = 'momentum_%d' % days
+  for i in range(len(features[ratio_key])): 
+    if tl.nan == features[ratio_key][i]:
+      rule_array.append('hold') 
+    elif features[momentum_key][i - 1] <= features[ratio_key][i]\
+      and features[momentum_key][i] > features[ratio_key][i]:
+      rule_array.append('buy')
+    elif features[momentum_key][i - 1] >= features[ratio_key][i]\
+      and features[momentum_key][i] < features[ratio_key][i]:
+      rule_array.append('sell')
+    else:
+      rule_array.append('hold')
+  print rule_array
+  return rule_array
+ 
 def complete_datapoint(datum, feature_set, index):
   for metric in feature_set:
     metric_features = feature_set[metric]
     if metric == 'bband_rule': 
+      datum[metric] = metric_features[index]
+      continue
+    elif metric.startswith('momentum_rule'):
       datum[metric] = metric_features[index]
       continue
     for feature in metric_features:
@@ -111,6 +144,19 @@ def get_features_from_vectors(data_vectors):
                                           data_vectors['adj_close'], 
                                           feature_dict['adj_close_features']
                                         )
+  feature_dict['momentum_rule_12'] = apply_momentum_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=12
+                                        )
+  feature_dict['momentum_rule_18'] = apply_momentum_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=18
+                                        )
+  feature_dict['momentum_rule_24'] = apply_momentum_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=24
+                                        )
+
   return feature_dict
 
 snp_vector = None
