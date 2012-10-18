@@ -82,7 +82,61 @@ def get_feature_from_vector(vector):
   ema = tl.EMA(feature_dict['momentum_24'], timeperiod=2)
   feature_dict['momentum_to_ema_24'] = np.divide(feature_dict['momentum_24'], ema) 
   feature_dict['ema_to_mom_24'] = ema
+  
+  feature_dict['rate_of_change_10'] = tl.ROCP(vector, timeperiod=10)
+  feature_dict['rate_of_change_16'] = tl.ROCP(vector, timeperiod=16)
+  feature_dict['rate_of_change_22'] = tl.ROCP(vector, timeperiod=22)
+  
+  feature_dict['macd_18'] = tl.MACD(vector, fastperiod=12, slowperiod=18)[0]
+  ema = tl.EMA(feature_dict['macd_18'], timeperiod=9)
+  feature_dict['macds_18'] = ema
+  feature_dict['macdsr_18'] = np.divide(feature_dict['macd_18'], ema)
+  feature_dict['macd_24'] = tl.MACD(vector, fastperiod=12, slowperiod=24)[0]
+  ema = tl.EMA(feature_dict['macd_24'], timeperiod=9)
+  feature_dict['macds_24'] = ema
+  feature_dict['macdsr_24'] = np.divide(feature_dict['macd_24'], ema)
+  feature_dict['macd_30'] = tl.MACD(vector, fastperiod=12, slowperiod=30)[0]
+  ema = tl.EMA(feature_dict['macd_30'], timeperiod=9)
+  feature_dict['macds_30'] = ema
+  feature_dict['macdsr_30'] = np.divide(feature_dict['macd_30'], ema)
+  feature_dict['rsi_8'] = tl.RSI(vector, timeperiod=8)
+  feature_dict['rsi_14'] = tl.RSI(vector, timeperiod=14)
+  feature_dict['rsi_20'] = tl.RSI(vector, timeperiod=20)
   return feature_dict
+
+def apply_rsi_rule(features, days=8):
+  rule_array = []
+  key = 'rsi_%d' % days
+  for i in range(len(features[key])):
+    if tl.nan == features[key][i]:
+      rule_array.append('hold')
+    elif features[key][i - 1] >= 30\
+      and features[key][i] < 70:
+      rule_array.append('buy')
+    elif features[key][i -1] <= 30\
+      and features[key][i] > 70:
+      rule_array.append('sell')
+    else:
+      rule_array.append('hold')
+  print rule_array
+  return rule_array
+
+def apply_macd_rule(features, days=18):
+  rule_array = []
+  key = 'macd_%d' % days
+  macds_key = 'macds_%s' % days
+  for i in range(len(features[key])):
+    if tl.nan == features[key][i]:
+      rule_array.append('hold')
+    elif features[key][i - 1] <= features[macds_key][i]\
+      and features[key][i] > features[macds_key][i]:
+      rule_array.append('buy')
+    elif features[key][i - 1] >= features[macds_key][i]\
+      and features[key][i] < features[macds_key][i]:
+      rule_array.append('sell')
+    else:
+      rule_array.append('hold')
+  return rule_array
 
 def apply_bollinger_rule(close_prices, features):
   rule_array = []
@@ -115,9 +169,22 @@ def apply_momentum_rule(features, days=24):
       rule_array.append('sell')
     else:
       rule_array.append('hold')
-  print rule_array
   return rule_array
  
+def apply_roc_rule(features, days=12):
+  key = 'rate_of_change_%d' % days
+  rule_array = []
+  for i in range(len(features[key])):
+    if tl.nan == features[key][i]:
+      rule_array.append('hold')
+    elif features[key][i] > 0 and features[key][i-1] <= 0:
+      rule_array.append('buy')
+    elif features[key][i] < 0 and features[key][i-1] >= 0:
+      rule_array.append('sell')
+    else:
+      rule_array.append('hold')
+  return rule_array
+
 def complete_datapoint(datum, feature_set, index):
   for metric in feature_set:
     metric_features = feature_set[metric]
@@ -125,6 +192,15 @@ def complete_datapoint(datum, feature_set, index):
       datum[metric] = metric_features[index]
       continue
     elif metric.startswith('momentum_rule'):
+      datum[metric] = metric_features[index]
+      continue
+    elif metric.startswith('roc_rule'):
+      datum[metric] = metric_features[index]
+      continue
+    elif metric.startswith('macd_rule'):
+      datum[metric] = metric_features[index]
+      continue
+    elif metric.starts_with('rsi_rule'):
       datum[metric] = metric_features[index]
       continue
     for feature in metric_features:
@@ -139,11 +215,12 @@ def get_features_from_vectors(data_vectors):
     print 'Extracting features from %s' % vector
     features = get_feature_from_vector(data_vectors[vector])
     feature_dict[vector+'_features'] = features
-  print 'Applying bollinger trading rule'
+  print 'Applying bollinger rule'
   feature_dict['bband_rule'] = apply_bollinger_rule(
                                           data_vectors['adj_close'], 
                                           feature_dict['adj_close_features']
                                         )
+  print 'Applying momentum rules'
   feature_dict['momentum_rule_12'] = apply_momentum_rule(
                                           feature_dict['adj_close_features'],
                                           days=12
@@ -156,7 +233,45 @@ def get_features_from_vectors(data_vectors):
                                           feature_dict['adj_close_features'],
                                           days=24
                                         )
-
+  print 'Applying rate of change rules'
+  feature_dict['roc_rule_10'] = apply_roc_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=10
+                                        )
+  feature_dict['roc_rule_16'] = apply_roc_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=16
+                                        )
+  feature_dict['roc_rule_22'] = apply_roc_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=22
+                                        )
+  print 'Applying MACD rules'
+  feature_dict['macd_rule_18'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=18
+                                        )
+  feature_dict['macd_rule_24'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=24
+                                        )
+  feature_dict['macd_rule_30'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=30
+                                        )
+  print 'Applying RSI rules'
+  feature_dict['rsi_rule_8'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=8
+                                        )
+  feature_dict['rsi_rule_14'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=14
+                                        )
+  feature_dict['rsi_rule_20'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          days=20
+                                        )
   return feature_dict
 
 snp_vector = None
