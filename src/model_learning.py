@@ -3,7 +3,9 @@ import feature_extractor as fe
 from sklearn.feature_extraction import DictVectorizer as dv
 import numpy as np
 from sklearn.grid_search import GridSearchCV as gs
-from sklearn.ensemble import GradientBoostingClassifier as gc
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier
+from sklearn.svm import SVC, NuSVC
+import sys
 
 def get_clean_data(ticker):
   clean_data = list()
@@ -40,12 +42,45 @@ def get_data(data, labels):
   
   return train.todense(), test
 
-def get_best_model_params(model, data, labels):
+def select_model(model_key):
+  model = None
+  if model_key == 'b':
+    model = GradientBoostingClassifier()
+  elif model_key == 'svc':
+    model = SVC()
+  elif model_key == 'nusvc':
+    model = NuSVC()
+  elif model_key == 'r':
+    model = RandomForestClassifier()
+  elif model_key == 'e':
+    model = ExtraTreesClassifier()
+  return model, model_key
+
+def get_hyper_parameters(model_key):
+  hyper_parameters = None
+  if model_key == 'b':
+    hyper_parameters = [{'learn_rate':[.1], 'n_estimators': [800],
+                         'max_depth': [6], 'subsample':[1.0], 'max_features': [ 14]}]
+  elif model_key == 'svc':
+    hyper_parameters = [{'C':[.1, .5, 1], 'kernel':['rbf', 'poly', 'sigmoid'], 'degree':[3, 6, 9]
+                         ,'gamma':[0, .01, .1], 'coef0':[0, .01, .1]}]
+  elif model_key == 'nusvc':
+    hyper_parameters = [{'nu':[.1, .5, 1], 'kernel':['rbf', 'poly', 'sigmoid'], 'degree':[3, 6, 9]
+                         ,'gamma':[0, .01, .1], 'coef0':[0, .01, .1]}] 
+  elif model_key == 'r':
+    hyper_parameters = [{'n_estimators':[10, 100, 200], 'criterion':['gini', 'entropy']
+                        ,'n_jobs':[2], 'max_features':['sqrt', 'log2']}]
+  elif model_key == 'e':
+    hyper_parameters = [{'n_estimators':[10, 100, 200], 'criterion':['gini', 'entropy']
+                        ,'n_jobs':[2], 'max_features':['sqrt', 'log2']}]
+  return hyper_parameters
+
+def get_best_model_params(model, data, labels, model_type='b'):
   x_train, x_test, y_train, y_test = get_data_sets(data, labels)
   train = dv().fit_transform(x_train)
   test = np.array(y_train)
-  hyper_parameters = [{'learn_rate':[.1], 'n_estimators': [800],
-                       'max_depth': [6], 'subsample':[1.0], 'max_features': [ 14]}]
+  
+  hyper_parameters = get_hyper_parameters(model_type)
   clf = gs(model, hyper_parameters)  
   clf.fit(train.todense(), test)
   
@@ -53,8 +88,8 @@ def get_best_model_params(model, data, labels):
   print
   print clf.best_estimator_
   
-  #for params, mean_score, scores in clf.grid_scores_:
-  #  print "%0.3f (+/-%0.03f) for %r" % (mean_score, scores.std() / 2, params)
+  for params, mean_score, scores in clf.grid_scores_:
+    print "%0.3f (+/-%0.03f) for %r" % (mean_score, scores.std() / 2, params)
     
   train = dv().fit_transform(x_test)
   test = np.array(y_test)
@@ -63,10 +98,45 @@ def get_best_model_params(model, data, labels):
 
 if __name__ == '__main__':
   d = l = None
-  if len(sys.argv) > 2:
-    d, l = get_clean_dats(sys.argv[1])
+  if len(sys.argv) == 2:
+    print 'Ticker file: %s' % sys.argv[1]
+    f = open(sys.argv[1])
+    out_file = open('output.txt', 'w')
+    for line in f:
+      ticker = line.strip()
+      print '*' * 50, ticker
+      d, l = get_clean_data(ticker)
+      try:
+        c = get_best_model_params(GradientBoostingClassifier(), d, l)
+        features, test = get_data(d, l)
+        score = c.score(features, test)
+        out_file.write("%s, %f\n" % (ticker, score))
+        print '*' * 50, 'Score for %s: %f' % (ticker, score)
+      except:
+        pass
+    f.close()
+    out_file.close()
+  elif len(sys.argv) >= 3:
+    print 'Ticker file: %s' % sys.argv[1]
+    f = open(sys.argv[1])
+    out_file = open('output.txt', 'w')
+    for line in f:
+      ticker = line.strip()
+      print '*' * 50, ticker
+      d, l = get_clean_data(ticker)
+      try:
+        model, mtype = select_model(sys.argv[2])
+        c = get_best_model_params(model, d, l, model_type=mtype)
+        features, test = get_data(d, l)
+        score = c.score(features, test)
+        out_file.write("%s, %f\n" % (ticker, score))
+        print '*' * 50, 'Score for %s: %f' % (ticker, score)
+      except:
+        pass
+    f.close()
+    out_file.close()
   else:
-    d, l = get_clean_data('YHOO')
-    c = get_best_model_params(gc(), d, l)
+    d, l = get_clean_data('GOOG')
+    c = get_best_model_params(GradientBoostingClassifier(), d, l)
     features, test = get_data(d, l)
     print c.score(features, test)

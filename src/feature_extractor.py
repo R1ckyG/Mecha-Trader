@@ -87,18 +87,61 @@ def get_feature_from_vector(vector):
   feature_dict['rate_of_change_16'] = tl.ROCP(vector, timeperiod=16)
   feature_dict['rate_of_change_22'] = tl.ROCP(vector, timeperiod=22)
   
-  feature_dict['macd_18'] = tl.MACD(vector, fastperiod=12, slowperiod=18)[0]
-  ema = tl.EMA(feature_dict['macd_18'], timeperiod=9)
-  feature_dict['macds_18'] = ema
-  feature_dict['macdsr_18'] = np.divide(feature_dict['macd_18'], ema)
-  feature_dict['macd_24'] = tl.MACD(vector, fastperiod=12, slowperiod=24)[0]
-  ema = tl.EMA(feature_dict['macd_24'], timeperiod=9)
-  feature_dict['macds_24'] = ema
-  feature_dict['macdsr_24'] = np.divide(feature_dict['macd_24'], ema)
-  feature_dict['macd_30'] = tl.MACD(vector, fastperiod=12, slowperiod=30)[0]
-  ema = tl.EMA(feature_dict['macd_30'], timeperiod=9)
-  feature_dict['macds_30'] = ema
-  feature_dict['macdsr_30'] = np.divide(feature_dict['macd_30'], ema)
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[0]
+  feature_dict['macd_0_18'] = macd 
+  ema = tl.EMA(feature_dict['macd_0_18'], timeperiod=9)
+  feature_dict['macds_0_18'] = ema
+  feature_dict['macdsr_0_18'] = np.divide(feature_dict['macd_0_18'], ema)
+  
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[1]
+  feature_dict['macd_1_18'] = macd 
+  ema = tl.EMA(macd, timeperiod=9)
+  feature_dict['macds_1_18'] = ema
+  feature_dict['macdsr_1_18'] = np.divide(feature_dict['macd_1_18'], ema)
+  
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[2]
+  feature_dict['macd_2_18'] = macd 
+  ema = tl.EMA(macd, timeperiod=9)
+  feature_dict['macds_2_18'] = ema
+  feature_dict['macdsr_2_18'] = np.divide(feature_dict['macd_2_18'], ema)
+
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[0]
+  feature_dict['macd_0_24'] = macd 
+  ema = tl.EMA(feature_dict['macd_0_24'], timeperiod=9)
+  feature_dict['macds_0_24'] = ema
+  feature_dict['macdsr_0_24'] = np.divide(feature_dict['macd_0_24'], ema)
+  
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[1]
+  feature_dict['macd_1_24'] = macd 
+  ema = tl.EMA(feature_dict['macd_1_24'], timeperiod=9) 
+  feature_dict['macds_1_24'] = ema
+  feature_dict['macdsr_1_24'] = np.divide(feature_dict['macd_1_24'], ema)
+
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[2]
+  feature_dict['macd_2_24'] = macd 
+  ema = tl.EMA(feature_dict['macd_2_24'], timeperiod=9) 
+  feature_dict['macds_2_24'] = ema
+  feature_dict['macdsr_2_24'] = np.divide(feature_dict['macd_2_24'], ema)
+  
+
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[0]
+  feature_dict['macd_0_30'] = macd  
+  ema = tl.EMA(feature_dict['macd_0_30'], timeperiod=9)
+  feature_dict['macds_0_30'] = ema
+  feature_dict['macdsr_0_30'] = np.divide(feature_dict['macd_0_30'], ema)
+
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[1]
+  feature_dict['macd_1_30'] = macd  
+  ema = tl.EMA(feature_dict['macd_1_30'], timeperiod=9)
+  feature_dict['macds_1_30'] = ema
+  feature_dict['macdsr_1_30'] = np.divide(feature_dict['macd_1_30'], ema)
+  
+  macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[2]
+  feature_dict['macd_2_30'] = macd  
+  ema = tl.EMA(feature_dict['macd_2_30'], timeperiod=9)
+  feature_dict['macds_2_30'] = ema
+  feature_dict['macdsr_2_30'] = np.divide(feature_dict['macd_2_30'], ema)
+  
   feature_dict['rsi_8'] = tl.RSI(vector, timeperiod=8)
   feature_dict['rsi_14'] = tl.RSI(vector, timeperiod=14)
   feature_dict['rsi_20'] = tl.RSI(vector, timeperiod=20)
@@ -118,13 +161,12 @@ def apply_rsi_rule(features, days=8):
       rule_array.append('sell')
     else:
       rule_array.append('hold')
-  print rule_array
   return rule_array
 
-def apply_macd_rule(features, days=18):
+def apply_macd_rule(features, index=0, days=18):
   rule_array = []
-  key = 'macd_%d' % days
-  macds_key = 'macds_%s' % days
+  key = 'macd_%d_%d' % (index, days)
+  macds_key = 'macds_%d_%d' % (index, days)
   for i in range(len(features[key])):
     if tl.nan == features[key][i]:
       rule_array.append('hold')
@@ -200,7 +242,7 @@ def complete_datapoint(datum, feature_set, index):
     elif metric.startswith('macd_rule'):
       datum[metric] = metric_features[index]
       continue
-    elif metric.starts_with('rsi_rule'):
+    elif metric.startswith('rsi_rule'):
       datum[metric] = metric_features[index]
       continue
     for feature in metric_features:
@@ -247,28 +289,31 @@ def get_features_from_vectors(data_vectors):
                                           days=22
                                         )
   print 'Applying MACD rules'
-  feature_dict['macd_rule_18'] = apply_macd_rule(
+  feature_dict['macd_rule_0_18'] = apply_macd_rule(
                                           feature_dict['adj_close_features'],
+                                          index=0,
                                           days=18
                                         )
-  feature_dict['macd_rule_24'] = apply_macd_rule(
+  feature_dict['macd_rule_0_24'] = apply_macd_rule(
                                           feature_dict['adj_close_features'],
+                                          index=0,
                                           days=24
                                         )
-  feature_dict['macd_rule_30'] = apply_macd_rule(
+  feature_dict['macd_rule_0_30'] = apply_macd_rule(
                                           feature_dict['adj_close_features'],
+                                          index=0,
                                           days=30
                                         )
   print 'Applying RSI rules'
-  feature_dict['rsi_rule_8'] = apply_macd_rule(
+  feature_dict['rsi_rule_8'] = apply_rsi_rule(
                                           feature_dict['adj_close_features'],
                                           days=8
                                         )
-  feature_dict['rsi_rule_14'] = apply_macd_rule(
+  feature_dict['rsi_rule_14'] = apply_rsi_rule(
                                           feature_dict['adj_close_features'],
                                           days=14
                                         )
-  feature_dict['rsi_rule_20'] = apply_macd_rule(
+  feature_dict['rsi_rule_20'] = apply_rsi_rule(
                                           feature_dict['adj_close_features'],
                                           days=20
                                         )
@@ -308,7 +353,7 @@ def combine(data, vectors, features):
     complete_datum = complete_datapoint(data[i], features, i)
     bx, excess = find_bxret(data, snp_vector, vectors['adj_close'], i)
     complete_datum['bxret'] = bx
-    complete_datum['excess'] = excess
+    #complete_datum['excess'] = excess
     results.append(complete_datum)
   return results
 
