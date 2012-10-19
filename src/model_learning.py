@@ -22,7 +22,7 @@ def get_data_for_multiple(tickers):
   clean_data = list()
   clean_labels = list()
   for ticker in tickers:
-    data, labels = fe.get_clean_data(ticker)
+    data, labels = get_clean_data(ticker)
     clean_data.extend(data)
     clean_labels.extend(labels)
   return clean_data, clean_lables
@@ -120,6 +120,8 @@ if __name__ == '__main__':
     print 'Ticker file: %s' % sys.argv[1]
     f = open(sys.argv[1])
     out_file = open('output.txt', 'w')
+    ticker_list = []
+    print ticker_list
     for line in f:
       ticker = line.strip()
       print '*' * 50, ticker
@@ -131,7 +133,8 @@ if __name__ == '__main__':
         score = c.score(features, test)
         out_file.write("%s, %f\n" % (ticker, score))
         print '*' * 50, 'Score for %s: %f' % (ticker, score)
-      except:
+      except Exception, e:
+        print e 
         pass
     f.close()
     out_file.close()
