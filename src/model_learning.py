@@ -49,6 +49,7 @@ def select_model(model_key):
   elif model_key == 'svc':
     model = SVC()
   elif model_key == 'nusvc':
+    print 'selecting NuSVC'
     model = NuSVC()
   elif model_key == 'r':
     model = RandomForestClassifier()
@@ -79,7 +80,6 @@ def get_best_model_params(model, data, labels, model_type='b'):
   x_train, x_test, y_train, y_test = get_data_sets(data, labels)
   train = dv().fit_transform(x_train)
   test = np.array(y_train)
-  
   hyper_parameters = get_hyper_parameters(model_type)
   clf = gs(model, hyper_parameters)  
   clf.fit(train.todense(), test)
@@ -88,9 +88,6 @@ def get_best_model_params(model, data, labels, model_type='b'):
   print
   print clf.best_estimator_
   
-  for params, mean_score, scores in clf.grid_scores_:
-    print "%0.3f (+/-%0.03f) for %r" % (mean_score, scores.std() / 2, params)
-    
   train = dv().fit_transform(x_test)
   test = np.array(y_test)
   #print clf.score(train.todense(), test)
@@ -101,7 +98,7 @@ if __name__ == '__main__':
   if len(sys.argv) == 2:
     print 'Ticker file: %s' % sys.argv[1]
     f = open(sys.argv[1])
-    out_file = open('output.txt', 'w')
+    out_file = open('output.txt', 'w', buffering=0)
     for line in f:
       ticker = line.strip()
       print '*' * 50, ticker
@@ -112,16 +109,16 @@ if __name__ == '__main__':
         score = c.score(features, test)
         out_file.write("%s, %f\n" % (ticker, score))
         print '*' * 50, 'Score for %s: %f' % (ticker, score)
-      except:
+      except Exception, e:
+        print e
         pass
     f.close()
     out_file.close()
   elif len(sys.argv) >= 3:
-    print 'Ticker file: %s' % sys.argv[1]
+    print 'Ticker file: %s' % sys.argv
     f = open(sys.argv[1])
     out_file = open('output.txt', 'w')
     ticker_list = []
-    print ticker_list
     for line in f:
       ticker = line.strip()
       print '*' * 50, ticker

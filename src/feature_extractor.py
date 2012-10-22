@@ -123,7 +123,6 @@ def get_feature_from_vector(vector):
   feature_dict['macds_2_24'] = ema
   feature_dict['macdsr_2_24'] = np.divide(feature_dict['macd_2_24'], ema)
   
-
   macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[0]
   feature_dict['macd_0_30'] = macd  
   ema = tl.EMA(feature_dict['macd_0_30'], timeperiod=9)
@@ -147,6 +146,19 @@ def get_feature_from_vector(vector):
   feature_dict['rsi_20'] = tl.RSI(vector, timeperiod=20)
   return feature_dict
 
+def get_stoch_features(close, high, low, days=12):
+  slowk, slowd = tl.STOCH(high, low, close, fastk_period=days, 
+                          slowk_period=3, slowk_matype=tl.MA_SMA,
+                          slowd_period=3, slowd_matype=tl.MA_SMA)
+  fastk, fastd = tl.STOCHF(high, low, close, fastk_period=days,
+                          fastd_period=3, fastd_matype=tl.MA_SMA)
+  results = dict()
+  results['slowk_%d' % days] = slowk
+  results['slowd_%d' % days] = slowd
+  results['fastk_%d' % days] = fastk
+  results['fastd_%d' % days] = fastd
+  return results
+
 def apply_rsi_rule(features, days=8):
   rule_array = []
   key = 'rsi_%d' % days
@@ -158,6 +170,40 @@ def apply_rsi_rule(features, days=8):
       rule_array.append('buy')
     elif features[key][i -1] <= 30\
       and features[key][i] > 70:
+      rule_array.append('sell')
+    else:
+      rule_array.append('hold')
+  return rule_array
+
+def apply_stoch_fast_rule(features, days=12):
+  rule_array = []
+  dkey = 'fastd_%d' % days
+  kkey = 'fastk_%d' % days
+  for i in range(len(features[dkey])):
+    if tl.nan == features[kkey][i]:
+      rule_array.append('hold')
+    elif features[kkey][i -1] <= features[dkey][i]\
+      and features[kkey][i] > features[dkey][i]:
+      rule_array.append('buy')
+    elif features[kkey][i -1] >= features[dkey][i]\
+      and features[kkey][i] < features[dkey][i]:
+      rule_array.append('sell')
+    else:
+      rule_array.append('hold')
+  return rule_array
+
+def apply_stoch_slow_rule(features, days=12):
+  rule_array = []
+  dkey = 'slowd_%d' % days
+  kkey = 'slowk_%d' % days
+  for i in range(len(features[dkey])):
+    if tl.nan == features[kkey][i]:
+      rule_array.append('hold')
+    elif features[kkey][i -1] <= features[dkey][i]\
+     and features[kkey][i] > features[dkey][i]:
+      rule_array.append('buy')
+    elif features[kkey][i -1] >= features[dkey][i]\
+     and features[kkey][i] < features[dkey][i]:
       rule_array.append('sell')
     else:
       rule_array.append('hold')
@@ -245,9 +291,18 @@ def complete_datapoint(datum, feature_set, index):
     elif metric.startswith('rsi_rule'):
       datum[metric] = metric_features[index]
       continue
+    elif metric.startswith('fast_stochastic_rule'):
+      datum[metric] = metric_features[index]
+      continue
+    elif metric.startswith('slow_stochastic_rule'):
+      datum[metric] = metric_features[index]
+      continue
     for feature in metric_features:
       key = '%s_%s' %(metric, feature)
-      datum[key] = metric_features[feature][index]
+      try:
+        datum[key] = metric_features[feature][index]
+      except:
+        pass 
   return datum
 
 def get_features_from_vectors(data_vectors):
@@ -257,6 +312,15 @@ def get_features_from_vectors(data_vectors):
     print 'Extracting features from %s' % vector
     features = get_feature_from_vector(data_vectors[vector])
     feature_dict[vector+'_features'] = features
+  
+  close = data_vectors['adj_close']
+  high = data_vectors['high']
+  low = data_vectors['low']
+
+  feature_dict.update(get_stoch_features(close, high, low, days=12))
+  feature_dict.update(get_stoch_features(close, high, low, days=18))
+  feature_dict.update(get_stoch_features(close, high, low, days=24))
+  
   print 'Applying bollinger rule'
   feature_dict['bband_rule'] = apply_bollinger_rule(
                                           data_vectors['adj_close'], 
@@ -304,6 +368,36 @@ def get_features_from_vectors(data_vectors):
                                           index=0,
                                           days=30
                                         )
+  feature_dict['macd_rule_1_18'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          index=1,
+                                          days=18
+                                        )
+  feature_dict['macd_rule_1_24'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          index=1,
+                                          days=24
+                                        )
+  feature_dict['macd_rule_1_30'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          index=1,
+                                          days=30
+                                        )
+  feature_dict['macd_rule_2_18'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          index=2,
+                                          days=18
+                                        )
+  feature_dict['macd_rule_2_24'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          index=2,
+                                          days=24
+                                        )
+  feature_dict['macd_rule_2_30'] = apply_macd_rule(
+                                          feature_dict['adj_close_features'],
+                                          index=2,
+                                          days=30
+                                        )
   print 'Applying RSI rules'
   feature_dict['rsi_rule_8'] = apply_rsi_rule(
                                           feature_dict['adj_close_features'],
@@ -317,6 +411,10 @@ def get_features_from_vectors(data_vectors):
                                           feature_dict['adj_close_features'],
                                           days=20
                                         )
+  print 'Applying stochastic rules'
+  feature_dict['fast_stochastic_rule_12'] = apply_stoch_fast_rule(feature_dict, days=12)
+  feature_dict['fast_stochastic_rule_18'] = apply_stoch_fast_rule(feature_dict, days=18)
+  feature_dict['fast_stochastic_rule_24'] = apply_stoch_fast_rule(feature_dict, days=24)
   return feature_dict
 
 snp_vector = None
