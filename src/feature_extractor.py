@@ -415,6 +415,9 @@ def get_features_from_vectors(data_vectors):
   feature_dict['fast_stochastic_rule_12'] = apply_stoch_fast_rule(feature_dict, days=12)
   feature_dict['fast_stochastic_rule_18'] = apply_stoch_fast_rule(feature_dict, days=18)
   feature_dict['fast_stochastic_rule_24'] = apply_stoch_fast_rule(feature_dict, days=24)
+  feature_dict['slow_stochastic_rule_12'] = apply_stoch_slow_rule(feature_dict, days=12)
+  feature_dict['slow_stochastic_rule_18'] = apply_stoch_slow_rule(feature_dict, days=18)
+  feature_dict['slow_stochastic_rule_24'] = apply_stoch_slow_rule(feature_dict, days=24)
   return feature_dict
 
 snp_vector = None
