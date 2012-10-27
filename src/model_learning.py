@@ -5,7 +5,14 @@ import numpy as np
 from sklearn.grid_search import GridSearchCV as gs
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier
 from sklearn.svm import SVC, NuSVC
-import sys
+from sklearn.neighbors import KNeighborsClassifier
+import sys, talib, math
+
+def data_valid(datum):
+  for key in datum:
+    if isinstance(datum[key], float) and math.isnan(datum[key]):
+      return False
+  return True
 
 def get_clean_data(ticker):
   clean_data = list()
@@ -14,8 +21,9 @@ def get_clean_data(ticker):
   for d in data:
     d.pop('date')
     d.pop('_id')
-    labels.append(d.pop('bxret'))
-    clean_data.append(d)
+    if data_valid(d):
+      clean_data.append(d)
+      labels.append(d.pop('bxret'))
   return clean_data[31:], labels[31:]
 
 def get_data_for_multiple(tickers):
@@ -55,6 +63,8 @@ def select_model(model_key):
     model = RandomForestClassifier()
   elif model_key == 'e':
     model = ExtraTreesClassifier()
+  elif model_key == 'nn':
+    model = KNeighborsClassifier()
   return model, model_key
 
 def get_hyper_parameters(model_key):
@@ -74,6 +84,9 @@ def get_hyper_parameters(model_key):
   elif model_key == 'e':
     hyper_parameters = [{'n_estimators':[10, 100, 200], 'criterion':['gini', 'entropy']
                         ,'n_jobs':[2], 'max_features':['sqrt', 'log2']}]
+  elif model_key == 'nn':
+    hyper_parameters = [{'n_neighbors': [5, 15, 35, 61], 'algorithm': ['ball_tree', 'kd_tree'],
+                         'p':[1, 2, 3], 'weights':['distance', 'uniform'] }]
   return hyper_parameters
 
 def get_best_model_params(model, data, labels, model_type='b'):
@@ -117,7 +130,7 @@ if __name__ == '__main__':
   elif len(sys.argv) >= 3:
     print 'Ticker file: %s' % sys.argv
     f = open(sys.argv[1])
-    out_file = open('output.txt', 'w')
+    out_file = open('output.txt', 'w', buffering=0)
     ticker_list = []
     for line in f:
       ticker = line.strip()

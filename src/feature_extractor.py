@@ -291,10 +291,10 @@ def complete_datapoint(datum, feature_set, index):
     elif metric.startswith('rsi_rule'):
       datum[metric] = metric_features[index]
       continue
-    elif metric.startswith('fast_stochastic_rule'):
+    elif metric.startswith('fast'):
       datum[metric] = metric_features[index]
       continue
-    elif metric.startswith('slow_stochastic_rule'):
+    elif metric.startswith('slow'):
       datum[metric] = metric_features[index]
       continue
     for feature in metric_features:
@@ -302,6 +302,7 @@ def complete_datapoint(datum, feature_set, index):
       try:
         datum[key] = metric_features[feature][index]
       except:
+        print 'Uh oh', key
         pass 
   return datum
 
@@ -316,7 +317,6 @@ def get_features_from_vectors(data_vectors):
   close = data_vectors['adj_close']
   high = data_vectors['high']
   low = data_vectors['low']
-
   feature_dict.update(get_stoch_features(close, high, low, days=12))
   feature_dict.update(get_stoch_features(close, high, low, days=18))
   feature_dict.update(get_stoch_features(close, high, low, days=24))
@@ -454,7 +454,7 @@ def combine(data, vectors, features):
     complete_datum = complete_datapoint(data[i], features, i)
     bx, excess = find_bxret(data, snp_vector, vectors['adj_close'], i)
     complete_datum['bxret'] = bx
-    #complete_datum['excess'] = excess
+    complete_datum['excess'] = excess
     results.append(complete_datum)
   return results
 
