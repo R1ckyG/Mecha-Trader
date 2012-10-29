@@ -44,7 +44,7 @@ def make_data_vectors(data):
           'volume':volume, 'date':date}
 
 
-def get_feature_from_vector(vector):
+def get_feature_from_vector(vector, dtype=None):
   feature_dict = {}
   
   feature_dict['ema_10'] = tl.EMA(vector, timeperiod=10)
@@ -55,95 +55,96 @@ def get_feature_from_vector(vector):
   feature_dict['sma_16'] = tl.SMA(vector, timeperiod=16)
   feature_dict['sma_22'] = tl.SMA(vector, timeperiod=22)
   
-  upper, middle, lower = tl.BBANDS(vector, timeperiod=20, nbdevup=2, 
-                                   nbdevdn=2, matype=tl.MA_SMA)
-  feature_dict['bbands_20_upper'] = upper
-  feature_dict['bbands_20_lower'] = lower
+  if dtype == 'adj_close':
+    upper, middle, lower = tl.BBANDS(vector, timeperiod=20, nbdevup=2, 
+                                     nbdevdn=2, matype=tl.MA_SMA)
+    feature_dict['bbands_20_upper'] = upper
+    feature_dict['bbands_20_lower'] = lower
 
-  upper, middle, lower = tl.BBANDS(vector, timeperiod=26, nbdevup=2, 
-                                   nbdevdn=2, matype=tl.MA_SMA)
-  feature_dict['bbands_26_upper'] = upper
-  feature_dict['bbands_26_lower'] = lower
+    upper, middle, lower = tl.BBANDS(vector, timeperiod=26, nbdevup=2, 
+                                     nbdevdn=2, matype=tl.MA_SMA)
+    feature_dict['bbands_26_upper'] = upper
+    feature_dict['bbands_26_lower'] = lower
 
-  upper, middle, lower = tl.BBANDS(vector, timeperiod=32, nbdevup=2, 
-                                   nbdevdn=2, matype=tl.MA_SMA)
-  feature_dict['bbands_32_upper'] = upper
-  feature_dict['bbands_32_lower'] = lower
-  feature_dict['momentum_12'] = tl.MOM(vector, timeperiod=12)
-  feature_dict['momentum_18'] = tl.MOM(vector, timeperiod=18)
-  feature_dict['momentum_24'] = tl.MOM(vector, timeperiod=24)
-  
-  ema = tl.EMA(feature_dict['momentum_12'], timeperiod=2)
-  feature_dict['momentum_to_ema_12'] = np.divide(feature_dict['momentum_12'], ema) 
-  feature_dict['ema_to_mom_12'] = ema
-  ema = tl.EMA(feature_dict['momentum_18'], timeperiod=2)
-  feature_dict['momentum_to_ema_18'] = np.divide(feature_dict['momentum_18'], ema) 
-  feature_dict['ema_to_mom_18'] = ema
-  ema = tl.EMA(feature_dict['momentum_24'], timeperiod=2)
-  feature_dict['momentum_to_ema_24'] = np.divide(feature_dict['momentum_24'], ema) 
-  feature_dict['ema_to_mom_24'] = ema
-  
-  feature_dict['rate_of_change_10'] = tl.ROCP(vector, timeperiod=10)
-  feature_dict['rate_of_change_16'] = tl.ROCP(vector, timeperiod=16)
-  feature_dict['rate_of_change_22'] = tl.ROCP(vector, timeperiod=22)
-  
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[0]
-  feature_dict['macd_0_18'] = macd 
-  ema = tl.EMA(feature_dict['macd_0_18'], timeperiod=9)
-  feature_dict['macds_0_18'] = ema
-  feature_dict['macdsr_0_18'] = np.divide(feature_dict['macd_0_18'], ema)
-  
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[1]
-  feature_dict['macd_1_18'] = macd 
-  ema = tl.EMA(macd, timeperiod=9)
-  feature_dict['macds_1_18'] = ema
-  feature_dict['macdsr_1_18'] = np.divide(feature_dict['macd_1_18'], ema)
-  
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[2]
-  feature_dict['macd_2_18'] = macd 
-  ema = tl.EMA(macd, timeperiod=9)
-  feature_dict['macds_2_18'] = ema
-  feature_dict['macdsr_2_18'] = np.divide(feature_dict['macd_2_18'], ema)
+    upper, middle, lower = tl.BBANDS(vector, timeperiod=32, nbdevup=2, 
+                                     nbdevdn=2, matype=tl.MA_SMA)
+    feature_dict['bbands_32_upper'] = upper
+    feature_dict['bbands_32_lower'] = lower
+    feature_dict['momentum_12'] = tl.MOM(vector, timeperiod=12)
+    feature_dict['momentum_18'] = tl.MOM(vector, timeperiod=18)
+    feature_dict['momentum_24'] = tl.MOM(vector, timeperiod=24)
 
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[0]
-  feature_dict['macd_0_24'] = macd 
-  ema = tl.EMA(feature_dict['macd_0_24'], timeperiod=9)
-  feature_dict['macds_0_24'] = ema
-  feature_dict['macdsr_0_24'] = np.divide(feature_dict['macd_0_24'], ema)
-  
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[1]
-  feature_dict['macd_1_24'] = macd 
-  ema = tl.EMA(feature_dict['macd_1_24'], timeperiod=9) 
-  feature_dict['macds_1_24'] = ema
-  feature_dict['macdsr_1_24'] = np.divide(feature_dict['macd_1_24'], ema)
+    ema = tl.EMA(feature_dict['momentum_12'], timeperiod=2)
+    feature_dict['momentum_to_ema_12'] = np.divide(feature_dict['momentum_12'], ema) 
+    feature_dict['ema_to_mom_12'] = ema
+    ema = tl.EMA(feature_dict['momentum_18'], timeperiod=2)
+    feature_dict['momentum_to_ema_18'] = np.divide(feature_dict['momentum_18'], ema) 
+    feature_dict['ema_to_mom_18'] = ema
+    ema = tl.EMA(feature_dict['momentum_24'], timeperiod=2)
+    feature_dict['momentum_to_ema_24'] = np.divide(feature_dict['momentum_24'], ema) 
+    feature_dict['ema_to_mom_24'] = ema
 
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[2]
-  feature_dict['macd_2_24'] = macd 
-  ema = tl.EMA(feature_dict['macd_2_24'], timeperiod=9) 
-  feature_dict['macds_2_24'] = ema
-  feature_dict['macdsr_2_24'] = np.divide(feature_dict['macd_2_24'], ema)
-  
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[0]
-  feature_dict['macd_0_30'] = macd  
-  ema = tl.EMA(feature_dict['macd_0_30'], timeperiod=9)
-  feature_dict['macds_0_30'] = ema
-  feature_dict['macdsr_0_30'] = np.divide(feature_dict['macd_0_30'], ema)
+    feature_dict['rate_of_change_10'] = tl.ROCP(vector, timeperiod=10)
+    feature_dict['rate_of_change_16'] = tl.ROCP(vector, timeperiod=16)
+    feature_dict['rate_of_change_22'] = tl.ROCP(vector, timeperiod=22)
 
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[1]
-  feature_dict['macd_1_30'] = macd  
-  ema = tl.EMA(feature_dict['macd_1_30'], timeperiod=9)
-  feature_dict['macds_1_30'] = ema
-  feature_dict['macdsr_1_30'] = np.divide(feature_dict['macd_1_30'], ema)
-  
-  macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[2]
-  feature_dict['macd_2_30'] = macd  
-  ema = tl.EMA(feature_dict['macd_2_30'], timeperiod=9)
-  feature_dict['macds_2_30'] = ema
-  feature_dict['macdsr_2_30'] = np.divide(feature_dict['macd_2_30'], ema)
-  
-  feature_dict['rsi_8'] = tl.RSI(vector, timeperiod=8)
-  feature_dict['rsi_14'] = tl.RSI(vector, timeperiod=14)
-  feature_dict['rsi_20'] = tl.RSI(vector, timeperiod=20)
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[0]
+    feature_dict['macd_0_18'] = macd 
+    ema = tl.EMA(feature_dict['macd_0_18'], timeperiod=9)
+    feature_dict['macds_0_18'] = ema
+    feature_dict['macdsr_0_18'] = np.divide(feature_dict['macd_0_18'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[1]
+    feature_dict['macd_1_18'] = macd 
+    ema = tl.EMA(macd, timeperiod=9)
+    feature_dict['macds_1_18'] = ema
+    feature_dict['macdsr_1_18'] = np.divide(feature_dict['macd_1_18'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=18)[2]
+    feature_dict['macd_2_18'] = macd 
+    ema = tl.EMA(macd, timeperiod=9)
+    feature_dict['macds_2_18'] = ema
+    feature_dict['macdsr_2_18'] = np.divide(feature_dict['macd_2_18'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[0]
+    feature_dict['macd_0_24'] = macd 
+    ema = tl.EMA(feature_dict['macd_0_24'], timeperiod=9)
+    feature_dict['macds_0_24'] = ema
+    feature_dict['macdsr_0_24'] = np.divide(feature_dict['macd_0_24'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[1]
+    feature_dict['macd_1_24'] = macd 
+    ema = tl.EMA(feature_dict['macd_1_24'], timeperiod=9) 
+    feature_dict['macds_1_24'] = ema
+    feature_dict['macdsr_1_24'] = np.divide(feature_dict['macd_1_24'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=24)[2]
+    feature_dict['macd_2_24'] = macd 
+    ema = tl.EMA(feature_dict['macd_2_24'], timeperiod=9) 
+    feature_dict['macds_2_24'] = ema
+    feature_dict['macdsr_2_24'] = np.divide(feature_dict['macd_2_24'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[0]
+    feature_dict['macd_0_30'] = macd  
+    ema = tl.EMA(feature_dict['macd_0_30'], timeperiod=9)
+    feature_dict['macds_0_30'] = ema
+    feature_dict['macdsr_0_30'] = np.divide(feature_dict['macd_0_30'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[1]
+    feature_dict['macd_1_30'] = macd  
+    ema = tl.EMA(feature_dict['macd_1_30'], timeperiod=9)
+    feature_dict['macds_1_30'] = ema
+    feature_dict['macdsr_1_30'] = np.divide(feature_dict['macd_1_30'], ema)
+
+    macd = tl.MACD(vector, fastperiod=12, slowperiod=30)[2]
+    feature_dict['macd_2_30'] = macd  
+    ema = tl.EMA(feature_dict['macd_2_30'], timeperiod=9)
+    feature_dict['macds_2_30'] = ema
+    feature_dict['macdsr_2_30'] = np.divide(feature_dict['macd_2_30'], ema)
+
+    feature_dict['rsi_8'] = tl.RSI(vector, timeperiod=8)
+    feature_dict['rsi_14'] = tl.RSI(vector, timeperiod=14)
+    feature_dict['rsi_20'] = tl.RSI(vector, timeperiod=20)
   return feature_dict
 
 def get_stoch_features(close, high, low, days=12):
@@ -311,7 +312,7 @@ def get_features_from_vectors(data_vectors):
   for vector in data_vectors:
     if vector == 'date': continue
     print 'Extracting features from %s' % vector
-    features = get_feature_from_vector(data_vectors[vector])
+    features = get_feature_from_vector(data_vectors[vector], dtype=vector)
     feature_dict[vector+'_features'] = features
   
   close = data_vectors['adj_close']

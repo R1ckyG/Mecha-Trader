@@ -2,7 +2,7 @@
 import sys, datetime, pymongo
 import YahooFinanceRetriever
 
-START_DATE = '20100822'
+START_DATE = '20091002'
 STOCK_DB = 'stock_data'
 
 class StockDataStore(object):
