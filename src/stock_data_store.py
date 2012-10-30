@@ -58,18 +58,23 @@ class StockDataStore(object):
     return data
 
   def batch_fetch(self, ticker_file, start_date=START_DATE):
+    error_list = []
     f = open(ticker_file, 'r')
     for ticker in f:
       clean_ticker = ticker.strip()
       end_date = datetime.datetime.now().strftime('%Y%m%d')
       print 'Fetching data for %s from %s to %s'\
         % (clean_ticker, start_date, end_date)
-      self.fetch_and_store(
-                      clean_ticker, 
-                      start_date, 
-                      end_date
-                    )
-  
+      try:
+        self.fetch_and_store(
+                        clean_ticker, 
+                        start_date, 
+                        end_date
+                      )
+      except:
+        error_list.append(ticker)
+    print 'Failed tickers: %s' % '\n'.join(error_list)
+    
   def save_data(self, ticker, data):
     collection = self.db[ticker]
     for datum in data:
