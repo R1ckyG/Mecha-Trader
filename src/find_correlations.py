@@ -66,7 +66,7 @@ def compute_spread(s_1, s_2, beta):
   
 def garbage_collect(garbage):
   for trash in garbage:
-  	r('rm(%s)' % trash)
+    r('rm(%s)' % trash)
   r('gc(FALSE)')
 
 
@@ -88,11 +88,11 @@ def get_adf(t1, t2):
   t1 = t1.replace('^', '')
   t2 = t2.replace('^', '')
   try:
-  	df = r('data.frame(%s=l1, %s=l2)' % (t1, t2))
+    df = r('data.frame(%s=l1, %s=l2)' % (t1, t2))
   except:
-  	command = 'data.frame(%s=l1, %s=l2)' % (t1, t2)
-  	print 'ErRROR: %s' %  command
-  	return None
+    command = 'data.frame(%s=l1, %s=l2)' % (t1, t2)
+    print 'ErRROR: %s' %  command
+    return None
   r.assign('df', df)
   command = 'm <- lm(%s ~ %s + 0, data=df)' % (t1, t2)
   r(command)
@@ -107,8 +107,8 @@ def get_adf(t1, t2):
   gc.collect()
   return p[0]
 
-def is_significant(p_value):
-  result = True if p_value < .05 else False
+def is_significant(p_value, threshold=.05):
+  result = True if p_value < threshold else False
   return result
 
 def get_all_adf(tickers):
@@ -132,26 +132,32 @@ def get_all_adf(tickers):
   return adf
   
 def combine_tickers(tickers):
-	tl = multiprocessing.JoinableQueue()
-	for ticker in tickers:
-		for ticker_2 in  tickers:
-			tl.put('%s/%s' % (ticker, ticker_2))
-	return tl
-  
+  tl = []
+  for ticker in tickers:
+    for ticker_2 in  tickers:
+      if ticker == ticker_2: continue
+      tl.append('%s/%s' % (ticker, ticker_2))
+  return tl
+
+def get_formatted_adf(t_combo):
+  t1, t2 = t_combo.split('/')
+  p = get_adf(t1, t2)
+  return ('%s/%s' % (t1, t2), p, is_significant(p))
+
 class MultiCalc(multiprocessing.Process):
-	def __init__(self, queue, out):
-		super(MultiCalc, self).__init__()
-		self.q = queue
-		self.output = out
-	
-	def run(self):
-		while True:
-			comp = self.q.get()
-			p = get_adf(comp[0], comp[1])
-			t = (comp[0], comp[1], p, is_significant(p))
-			self.output.put(t)
-			self.q.task_done()
-		
+  def __init__(self, queue, out):
+    super(MultiCalc, self).__init__()
+    self.q = queue
+    self.output = out
+  
+  def run(self):
+    while True:
+      comp = self.q.get()
+      p = get_adf(comp[0], comp[1])
+      t = ('%s/%s' % (comp[0], comp[1]), p, is_significant(p))
+      self.output.put(t)
+      self.q.task_done()
+    
 if __name__ == '__main__':
   if len(sys.argv) == 2:
     f = open(sys.argv[1])
@@ -168,17 +174,14 @@ if __name__ == '__main__':
   elif len(sys.argv) > 2:
     f = open(sys.argv[1])
     tickers = [ticker.strip() for ticker in f]
-    f.close()
-    print 'Tickers: %d Num. of combinations: %d'\
-       % (len(tickers), scipy.misc.comb(len(tickers), 2))
-    corrs = get_all_adf(tickers)
-    corrs = sorted(corrs, key=operator.itemgetter(1))
+    c_tickers = combine_tickers(tickers)
+    c = multiprocessing.cpu_count()
+    print 'Using %d processes' % c
+    pool = multiprocessing.Pool(processes=c)
+    result = pool.imap_unordered(get_formatted_adf, c_tickers, chunksize=500)
+    result = filter(lambda x: True if x[1] else False, result)
+    result = sorted(result, key=operator.itemgetter(1))
     output = open('adf.txt', 'w', buffering=0)
-    for t in corrs:
-      output.write('%s, %f\n' % t)
-    output.close()
-	elif len(sys.argv) > 3:
-		c = multiprocessing.num_of_cpus()
-		for i in range(c):
-			
-		
+    for t in result:
+      output.write('%s, %f, %s,\n' % t)
+    output.close() 
