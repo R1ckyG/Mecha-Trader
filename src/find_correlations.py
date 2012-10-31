@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from __future__ import division
-import gc, sys, operator, scipy, datetime
+import gc, sys, operator, scipy, datetime, multiprocessing
 from rpy2 import robjects as ro 
 from rpy2.robjects import r
 from rpy2.robjects.packages import importr
@@ -85,11 +85,11 @@ def get_adf(t1, t2):
     
   r.assign('l1', ro.FloatVector(l1))
   r.assign('l2', ro.FloatVector(l2))
+  t1 = t1.replace('^', '')
+  t2 = t2.replace('^', '')
   try:
   	df = r('data.frame(%s=l1, %s=l2)' % (t1, t2))
   except:
-  	t1 = t1.replace('^', '')
-  	t2 = t2.replace('^', '')
   	command = 'data.frame(%s=l1, %s=l2)' % (t1, t2)
   	print 'ErRROR: %s' %  command
   	return None
@@ -130,7 +130,28 @@ def get_all_adf(tickers):
       if p is None: continue
       adf.append(('%s/%s' % (ticker, ticker_2), p, is_significant(p)))
   return adf
-
+  
+def combine_tickers(tickers):
+	tl = multiprocessing.JoinableQueue()
+	for ticker in tickers:
+		for ticker_2 in  tickers:
+			tl.put('%s/%s' % (ticker, ticker_2))
+	return tl
+  
+class MultiCalc(multiprocessing.Process):
+	def __init__(self, queue, out):
+		super(MultiCalc, self).__init__()
+		self.q = queue
+		self.output = out
+	
+	def run(self):
+		while True:
+			comp = self.q.get()
+			p = get_adf(comp[0], comp[1])
+			t = (comp[0], comp[1], p, is_significant(p))
+			self.output.put(t)
+			self.q.task_done()
+		
 if __name__ == '__main__':
   if len(sys.argv) == 2:
     f = open(sys.argv[1])
@@ -156,4 +177,8 @@ if __name__ == '__main__':
     for t in corrs:
       output.write('%s, %f\n' % t)
     output.close()
-     
+	elif len(sys.argv) > 3:
+		c = multiprocessing.num_of_cpus()
+		for i in range(c):
+			
+		
