@@ -4,11 +4,11 @@ import gc, sys, operator, scipy, datetime, multiprocessing
 from rpy2 import robjects as ro 
 from rpy2.robjects import r
 from rpy2.robjects.packages import importr
-import talib as tl
-import model_learning as ml
-import stock_data_store as sd
+import lib.talib as tl
+import anaylsis.model_learning as ml
+import data.stock_data_store as sd
 import numpy as np
-
+import utils.data_util as du
 def get_time_left(start_time, num_complete, total):
   dtime =  datetime.datetime.now() - start_time
   time_per_ticker = num_complete / dtime.total_seconds()
@@ -46,7 +46,7 @@ def get_correlations_for_tickers(tickers):
     for ticker_2 in tickers:
       tdata_2 = get_t_data(ticker_2)
       if len(t_data) != len(tdata_2):
-        continue  
+        t_data, tdata_2 = du.remap_data(t_data, tdata_2)  
       corr = get_correlation(t_data, tdata_2)[0]
       ident = '%s/%s' % (ticker, ticker_2)
       corrs.append((ident, corr)) 
@@ -70,7 +70,7 @@ def garbage_collect(garbage):
   r('gc(FALSE)')
 
 
-def get_adf(t1, t2):
+def get_adf(t1, t2, spread=False, portion=0):
   d1 = s.get_company_data(t1)
   d2 = s.get_company_data(t2)
   
@@ -81,8 +81,9 @@ def get_adf(t1, t2):
   for d in d2:
     l2.append(d['Adj Clos'])
   if len(l1) != len(l2):
-    return None
-    
+    l1, l2 = du.remap_data(l1, l2)
+  l1 = l1[int(len(l1) * portion):]
+  l2 = l2[int(len(l2) * portion):]  
   r.assign('l1', ro.FloatVector(l1))
   r.assign('l2', ro.FloatVector(l2))
   t1 = t1.replace('^', '')
@@ -105,6 +106,8 @@ def get_adf(t1, t2):
   p = r('ht$p.value')
   garbage_collect(['ht', 'sprd', 'l1', 'm', 'l2', 'df'])
   gc.collect()
+  if spread:
+    return p[0],sprd, beta   
   return p[0]
 
 def is_significant(p_value, threshold=.05):
@@ -141,22 +144,13 @@ def combine_tickers(tickers):
 
 def get_formatted_adf(t_combo):
   t1, t2 = t_combo.split('/')
-  p = get_adf(t1, t2)
-  return ('%s/%s' % (t1, t2), p, is_significant(p))
-
-class MultiCalc(multiprocessing.Process):
-  def __init__(self, queue, out):
-    super(MultiCalc, self).__init__()
-    self.q = queue
-    self.output = out
-  
-  def run(self):
-    while True:
-      comp = self.q.get()
-      p = get_adf(comp[0], comp[1])
-      t = ('%s/%s' % (comp[0], comp[1]), p, is_significant(p))
-      self.output.put(t)
-      self.q.task_done()
+  try:
+    p = get_adf(t1, t2)
+    result = ('%s/%s' % (t1, t2), p, is_significant(p))
+  except:
+    print 'F#CK#D up %s' % t_combo
+    result = None
+  return result 
     
 if __name__ == '__main__':
   if len(sys.argv) == 2:
@@ -177,7 +171,7 @@ if __name__ == '__main__':
     c_tickers = combine_tickers(tickers)
     c = multiprocessing.cpu_count()
     print 'Using %d processes' % c
-    pool = multiprocessing.Pool(processes=c)
+    pool = multiprocessing.Pool(processes=c - 1)
     result = pool.imap_unordered(get_formatted_adf, c_tickers, chunksize=500)
     result = filter(lambda x: True if x[1] else False, result)
     result = sorted(result, key=operator.itemgetter(1))

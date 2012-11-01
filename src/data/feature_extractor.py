@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
-import talib as tl
+import lib.talib as tl
 import stock_data_store, sys
 
 RISK_FREE = 5.0

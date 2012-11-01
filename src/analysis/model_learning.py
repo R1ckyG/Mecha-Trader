@@ -8,7 +8,8 @@ from sklearn.svm import SVC, NuSVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import DPGMM
 from sklearn.metrics import classification_report, confusion_matrix
-import sys, talib, math
+from lib import talib
+import sys, math
 
 def data_valid(datum):
   for key in datum:
