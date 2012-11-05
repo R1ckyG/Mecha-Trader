@@ -1,5 +1,6 @@
 from __future__ import division
 import data.stock_data_store as sds, lib.talib as tl, numpy
+
 def get_data(ticker):
   s = sds.StockDataStore()
   cursor = s.get_company_data(ticker)
@@ -25,15 +26,12 @@ def remap_data(d1, d2):
   else:
     return d1, d2[len2 - len1:]
 
-def run_command(command, data):
-  args, varargs, varkw, defaults = inspect.getargspec(func)
-  if defaults:
-    args=args[:-length]
+def run_command(command, data, **kwargs):
   if hasattr(tl, command):
     f =  getattr(tl, command)
     if isinstance(data, list):
       data = numpy.array(data)
-    return f(data)
+    return f(data, **kwargs)
   return None
 
 def get_feature_data(ticker, feature):
