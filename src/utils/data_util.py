@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import division
 import data.stock_data_store as sds, lib.talib as tl, numpy, sys
+from pyalgotrade.dataseries import DataSeries
 
 def get_data(ticker):
   s = sds.StockDataStore()
@@ -53,6 +54,51 @@ def write_csv_file(t, filename):
 	for d in data:
 		output.write("%s\n" % dict_to_row(d))
 	output.close()
+
+class FeatureDataSeries(DataSeries): 
+  def __init__(self, ticker, feature):
+    self.d = get_feature_data(ticker, feature)
+    self.ticker = ticker
+    self.feature = feature
+    self.firstvalid = None
+  
+  def getFirstValidPos(self):
+    i = 0
+    for d in self.d:
+      if d == math.nan:
+        i++
+        continue
+      return i
+    return None
+  
+  def getLength(self):
+    return len(self.d)
+  
+  def getValueAbsolute(self, pos):
+    return self.d[pos]    
+
+class RatioDataSeries(DataSeries): 
+  def __init__(self, ticker, ticker2 feature):
+    self.d = get_ratio_for_key(ticker, ticker2, feature)
+    self.ticker = ticker
+    self.ticker2 = ticker2
+    self.feature = feature
+    self.firstvalid = None
+
+  def getFirstValidPos(self):
+    i = 0
+    for d in self.d:
+      if d == math.nan:
+        i++
+        continue
+      return i
+    return None
+
+  def getLength(self):
+    return len(self.d)
+
+  def getValueAbsolute(self, pos):
+    return self.d[pos]
 
 if __name__ == '__main__':
 	write_csv_file(sys.argv[1], sys.argv[2])	
