@@ -1,5 +1,6 @@
+#!/usr/bin/env python
 from __future__ import division
-import data.stock_data_store as sds, lib.talib as tl, numpy
+import data.stock_data_store as sds, lib.talib as tl, numpy, sys
 
 def get_data(ticker):
   s = sds.StockDataStore()
@@ -37,3 +38,22 @@ def run_command(command, data, **kwargs):
 def get_feature_data(ticker, feature):
   d = get_data(ticker)
   return [data[feature] for data in d]
+
+
+def dict_to_row(d):
+	row = ''
+	for key in d:
+		row = row + '%s, ' % str(d[key])
+	return row
+
+def write_csv_file(t, filename):
+	data = get_data(t)
+	output = open(filename, 'w')
+	output.write('%s\n' % ', '.join(data[0].keys()))
+	for d in data:
+		output.write("%s\n" % dict_to_row(d))
+	output.close()
+
+if __name__ == '__main__':
+	write_csv_file(sys.argv[1], sys.argv[2])	
+	
