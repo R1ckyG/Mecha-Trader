@@ -45,7 +45,6 @@ class MongoFeed(csvfeed.BarFeed):
     for datum in data:
       if self.__barFilter is None or self.__barFilter.includeBar(datum):
         row = row_parser.parseBar(datum)
-        print row.getDateTime()
         loaded_bars.append(row)
     self.__bars[instrument].extend(loaded_bars)
     barcmp = lambda x, y: cmp(x.getDateTime(), y.getDateTime())
