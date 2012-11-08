@@ -143,8 +143,8 @@ class RatioDataSeries(DataSeries):
 
 
 class ArbiBar(bar.Bar):
-  def __init__(self, datetime, ratio):
-    bar.Bar.__init__(self, datetime, 0.0, 0.0, 0.0, 0.0, 0, 0.0)
+  def __init__(self, datetime, open_, high, low, close, volume, adjClose, ratio):
+    bar.Bar.__init__(self, datetime, open_, high, low, close, volume, adjClose)
     self.ratio = ratio
 
 class ArbiParser(csvfeed.RowParser):
@@ -159,7 +159,16 @@ class ArbiParser(csvfeed.RowParser):
     return None
   
   def parseBar(self, mongorow):
-    return ArbiBar(mongorow['date'], mongorow['ratio'])
+    openl = mongorow.pop('Open') if 'Open' in mongorow else 0.0
+    high = mongorow.pop('High') if 'High' in mongorow else 0.0
+    low =  mongorow.pop('Low') if 'Low' in mongorow else 0.0
+    close =  mongorow.pop('Close') if 'Close' in mongorow else 0.0
+    volume = mongorow.pop('Volume') if 'Volume' in mongorow else 0.0
+    adj_close = mongorow.pop('Adj Clos') if 'Adj Clos' in mongorow else 0.0
+    ratio = mongorow['ratio'] if 'ratio' in mongorow else None
+    return ArbiBar(mongorow['date'], openl, high, 
+                   low, close, volume, adj_close, 
+                   ratio)
     
 class ArbiFeed(csvfeed.BarFeed):
   def __init__(self, ftype='None'):

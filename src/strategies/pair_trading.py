@@ -9,19 +9,18 @@ from utils import data_util as du
 import sys, numpy as np
 
 class PairStrategy(strategy.Strategy):
-    def __init__(self, feed, smaPeriod, tick1, tick2):
-        strategy.Strategy.__init__(self, feed, 1000)
+    def __init__(self, feed, smaPeriod, f, tick1, tick2):
+        strategy.Strategy.__init__(self, f, 1000)
         self.__position = None
         self.__tick1 = tick1
         self.__tick2 = tick2
         self.pdata = feed.getDataSeries(tick1).getCloseDataSeries()
         ratio = du.get_ratio_for_key_with_date(tick1, tick2, 'Adj Clos')
-        f = du.ArbiFeed()
         f.addBarsFromCSV(ratio, '%s/%s' %(tick1, tick2))
+        f.addBarsFromCSV(du.get_data(tick1), tick1)
         def get_ratio(bar):
-        	print 'ratio', bar.ratio
-        	return bar.ratio
-        
+          return bar.ratio
+        self.ratios = f.getDataSeries('%s/%s' %(tick1, tick2)), dir(f)
         self.ratios = dataseries.BarValueDataSeries(f.getDataSeries('%s/%s' %(tick1, tick2)), get_ratio)
         self.ratio_series = du.RatioDataSeries(tick1, tick2, 'Adj Clos')
         a, b, c = du.run_command(
@@ -30,7 +29,7 @@ class PairStrategy(strategy.Strategy):
                       **{'timeperiod':smaPeriod, 'nbdevup':2, 'nbdevdn':2, 'matype':du.tl.MA_SMA}
                   )
         self.highs = dataseries.SequenceDataSeries([d for d in a.tolist()])
-        print [d for d in a.tolist()]
+        #print [d for d in a.tolist()]
         self.mids = dataseries.SequenceDataSeries([d for d in b.tolist()])
         self.lows = dataseries.SequenceDataSeries([d for d in c.tolist()])
         """
@@ -83,9 +82,10 @@ def run_strategy(smaPeriod, tick, tick2='TRNS'):
     # Load the yahoo feed from the CSV file
     feed = mongofeed.MongoFeed()
     feed.addBarsFromCSV(tick, mongofeed.MongoRowParser())
+    f = du.ArbiFeed()
 
     # Evaluate the strategy with the feed's bars.
-    myStrategy = PairStrategy(feed, smaPeriod, tick, 'TRNS')
+    myStrategy = PairStrategy(feed, smaPeriod, f, tick, 'TRNS')
     myStrategy.run()
 
-run_strategy(15, sys.argv[1])
+run_strategy(150, sys.argv[1])
