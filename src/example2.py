@@ -6,7 +6,7 @@ import sys
 
 class MyStrategy(strategy.Strategy):
     def __init__(self, feed, smaPeriod, tick):
-        strategy.Strategy.__init__(self, feed, 100000)
+        strategy.Strategy.__init__(self, feed, 800000)
         self.__sma = ma.SMA(feed.getDataSeries(tick).getCloseDataSeries(), smaPeriod)
         self.__position = None
         self.__tick = tick

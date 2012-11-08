@@ -20,6 +20,7 @@ class MongoRowParser(csvfeed.RowParser):
     return None
   
   def parseBar(self, mongorow):
+    self.__fields = mongorow.keys()
     date = mongorow.pop('date')
     openl = mongorow.pop('Open')
     high = mongorow.pop('High')

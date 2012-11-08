@@ -1,19 +1,28 @@
+#!/usr/bin/env python
 from pyalgotrade import strategy, dataseries
 from pyalgotrade.barfeed import yahoofeed
 from pyalgotrade.technical import ma
 from pyalgotrade.technical import cross
 from data import mongofeed
+from pyalgotrade.dataseries import BarValueDataSeries
 from utils import data_util as du
 import sys, numpy as np
 
 class PairStrategy(strategy.Strategy):
     def __init__(self, feed, smaPeriod, tick1, tick2):
-        strategy.Strategy.__init__(self, feed, 100000)
+        strategy.Strategy.__init__(self, feed, 1000)
         self.__position = None
         self.__tick1 = tick1
         self.__tick2 = tick2
         self.pdata = feed.getDataSeries(tick1).getCloseDataSeries()
-        self.ratios = dataseries.SequenceDataSeries(du.get_ratio_for_key(tick1, tick2, 'Adj Clos'))
+        ratio = du.get_ratio_for_key_with_date(tick1, tick2, 'Adj Clos')
+        f = du.ArbiFeed()
+        f.addBarsFromCSV(ratio, '%s/%s' %(tick1, tick2))
+        def get_ratio(bar):
+        	print 'ratio', bar.ratio
+        	return bar.ratio
+        
+        self.ratios = dataseries.BarValueDataSeries(f.getDataSeries('%s/%s' %(tick1, tick2)), get_ratio)
         self.ratio_series = du.RatioDataSeries(tick1, tick2, 'Adj Clos')
         a, b, c = du.run_command(
                       'BBANDS',
@@ -29,7 +38,7 @@ class PairStrategy(strategy.Strategy):
         self.mids = du.ArbitraryDataSeries('Mean', b.tolist())
         self.lows = du.ArbitraryDataSeries('Lower BBand', c.tolist()) 
         """
-        self.cross_below = cross.CrossAbove(self.pdata, self.highs)
+        self.cross_below = cross.CrossAbove(self.ratios, self.highs)
         self.cross_above = cross.CrossBelow(self.ratios, self.mids)
       
             
@@ -59,13 +68,12 @@ class PairStrategy(strategy.Strategy):
         bar = bars.getBar(self.__tick1)
         # If a position was not opened, check if we should enter a long position.
         if self.__position == None:
-            print 'Inside'
-            if self.cross_below.getValue()  > 0:
+            if self.cross_below.getValue() > 0:
                 print 'More Inside'
                 # Enter a buy market order for 10 orcl shares. The order is good till canceled.
                 self.__position = self.enterLong(self.__tick1, 10, True)
         # Check if we have to exit the position.
-        elif self.cross_above.getValue()  > 0:
+        elif self.cross_above.getValue() > 0:
              self.exitPosition(self.__position)
 
     def onFinish(self, bars):

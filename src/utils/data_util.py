@@ -2,6 +2,8 @@
 from __future__ import division
 import data.stock_data_store as sds, lib.talib as tl, numpy, sys, math
 from pyalgotrade.dataseries import DataSeries
+from pyalgotrade.barfeed import csvfeed
+from pyalgotrade import bar
 
 def get_data(ticker):
   s = sds.StockDataStore()
@@ -14,6 +16,16 @@ def get_ratio_for_key(t1, t2, key):
   if len(t1_data) != len(t2_data):
     t1_data, t2_data = remap_data(t1_data, t2_data) 
   return [t1_data[i][key] / t2_data[i][key] for i in range(len(t1_data))]
+
+def get_ratio_for_key_with_date(t1, t2, key):
+  t1_data = get_data(t1)
+  t2_data = get_data(t2)
+  if len(t1_data) != len(t2_data):
+    t1_data, t2_data = remap_data(t1_data, t2_data) 
+  d = []
+  for i in range(len(t1_data)):
+    d.append({'date':t1_data[i]['date'], 'ratio':(t1_data[i][key] / t2_data[i][key])})
+  return d
 
 def remap_data(d1, d2):
   len1 = len(d1)
@@ -40,18 +52,18 @@ def get_feature_data(ticker, feature):
 
 
 def dict_to_row(d):
-	row = ''
-	for key in d:
-		row = row + '%s, ' % str(d[key])
-	return row
+  row = ''
+  for key in d:
+    row = row + '%s, ' % str(d[key])
+  return row
 
 def write_csv_file(t, filename):
-	data = get_data(t)
-	output = open(filename, 'w')
-	output.write('%s\n' % ', '.join(data[0].keys()))
-	for d in data:
-		output.write("%s\n" % dict_to_row(d))
-	output.close()
+  data = get_data(t)
+  output = open(filename, 'w')
+  output.write('%s\n' % ', '.join(data[0].keys()))
+  for d in data:
+    output.write("%s\n" % dict_to_row(d))
+  output.close()
 
 class ArbitraryDataSeries(DataSeries): 
   def __init__(self, desc, data):
@@ -115,20 +127,89 @@ class RatioDataSeries(DataSeries):
     return len(self.d)
 
   def getValueAbsolute(self, pos):
-		# Check that there are enough values to calculate this (given the current window size and the nested ones).
-		print 'say what'
-		if pos < self.getFirstValidPos() or pos >= self.getLength():
-			return None
+    # Check that there are enough values to calculate this (given the current window size and the nested ones).
+    print 'say what'
+    if pos < self.getFirstValidPos() or pos >= self.getLength():
+      return None
  
-		# Check that we have enough values to use
-		firstPos = pos - self.__windowSize + 1
-		assert(firstPos >= 0)
+    # Check that we have enough values to use
+    firstPos = pos - self.__windowSize + 1
+    assert(firstPos >= 0)
  
-		# Try to get the value from the cache.
-		ret = self.d[pos]
-		# Avoid caching None's in case a invalid pos is requested that becomes valid in the future.
-		return ret
+    # Try to get the value from the cache.
+    ret = self.d[pos]
+    # Avoid caching None's in case a invalid pos is requested that becomes valid in the future.
+    return ret
+
+
+class ArbiBar(bar.Bar):
+  def __init__(self, datetime, ratio):
+    bar.Bar.__init__(self, datetime, 0.0, 0.0, 0.0, 0.0, 0, 0.0)
+    self.ratio = ratio
+
+class ArbiParser(csvfeed.RowParser):
+  def __init__(self, zone=0):
+    self.__zone = zone
+    self.__fields = []
+  
+  def getFieldNames(self):
+    return self.__fields
+
+  def getDelimitter(self):
+    return None
+  
+  def parseBar(self, mongorow):
+    return ArbiBar(mongorow['date'], mongorow['ratio'])
+    
+class ArbiFeed(csvfeed.BarFeed):
+  def __init__(self, ftype='None'):
+    csvfeed.BarFeed.__init__(self)
+    self.f_type = ftype
+    self.__bars = {}
+    self.__nextBarIdx = {}
+    self.__barFilter = None
+  
+  def addBarsFromCSV(self, data, instrument='None', row_parser=ArbiParser()):
+    self.__bars.setdefault(instrument, [])
+    self.__nextBarIdx.setdefault(instrument, 0)
+    
+    loaded_bars = []
+    for datum in data:
+      if self.__barFilter is None or self.__barFilter.includeBar(datum):
+        row = row_parser.parseBar(datum)
+        loaded_bars.append(row)
+    self.__bars[instrument].extend(loaded_bars)
+    barcmp = lambda x, y: cmp(x.getDateTime(), y.getDateTime())
+    self.__bars[instrument].sort(barcmp)
+    self.registerInstrument(instrument)
+  
+  def getNextBars(self):
+    # All bars must have the same datetime. We will return all the ones with the smallest datetime.
+    smallestDateTime = None
+
+    # Make a first pass to get the smallest datetime.
+    for instrument, bars in self.__bars.iteritems():
+      nextIdx = self.__nextBarIdx[instrument]
+      if nextIdx < len(bars):
+        if smallestDateTime == None or bars[nextIdx].getDateTime() < smallestDateTime:
+          smallestDateTime = bars[nextIdx].getDateTime()
+
+    if smallestDateTime == None:
+      return None
+
+    # Make a second pass to get all the bars that had the smallest datetime.
+    ret = {}
+    for instrument, bars in self.__bars.iteritems():
+      nextIdx = self.__nextBarIdx[instrument]
+      if nextIdx < len(bars) and bars[nextIdx].getDateTime() == smallestDateTime:
+        ret[instrument] = bars[nextIdx]
+        self.__nextBarIdx[instrument] += 1
+    return bar.Bars(ret)
+    
 
 if __name__ == '__main__':
-	write_csv_file(sys.argv[1], sys.argv[2])	
-	
+  #write_csv_file(sys.argv[1], sys.argv[2]) 
+  a = ArbiFeed()
+  d = get_ratio_for_key_with_date('TRNS', 'MAKO', 'Adj Clos')
+  a.addBarsFromCSV(d)
+  print dir(a.getNextBars().getBar('None'))
