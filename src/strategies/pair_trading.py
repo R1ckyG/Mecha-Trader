@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from pyalgotrade import strategy, dataseries
+from pyalgotrade import strategy, dataseries, plotter
 from pyalgotrade.barfeed import yahoofeed
 from pyalgotrade.technical import ma
 from pyalgotrade.technical import cross
@@ -10,14 +10,12 @@ import sys, numpy as np
 
 class PairStrategy(strategy.Strategy):
     def __init__(self, feed, smaPeriod, f, tick1, tick2):
-        strategy.Strategy.__init__(self, f, 1000)
+        strategy.Strategy.__init__(self, f, 8000)
         self.__position = None
         self.__tick1 = tick1
         self.__tick2 = tick2
         self.pdata = feed.getDataSeries(tick1).getCloseDataSeries()
-        ratio = du.get_ratio_for_key_with_date(tick1, tick2, 'Adj Clos')
-        f.addBarsFromCSV(ratio, '%s/%s' %(tick1, tick2))
-        f.addBarsFromCSV(du.get_data(tick1), tick1)
+
         def get_ratio(bar):
           return bar.ratio
         self.ratios = f.getDataSeries('%s/%s' %(tick1, tick2)), dir(f)
@@ -37,8 +35,8 @@ class PairStrategy(strategy.Strategy):
         self.mids = du.ArbitraryDataSeries('Mean', b.tolist())
         self.lows = du.ArbitraryDataSeries('Lower BBand', c.tolist()) 
         """
-        self.cross_below = cross.CrossAbove(self.ratios, self.highs)
-        self.cross_above = cross.CrossBelow(self.ratios, self.mids)
+        self.cross_below = cross.CrossBelow(self.ratios, self.highs)
+        self.cross_above = cross.CrossAbove(self.ratios, self.mids)
       
             
     def onStart(self):
@@ -46,14 +44,17 @@ class PairStrategy(strategy.Strategy):
 
     def onEnterOk(self, position):
         execInfo = position.getEntryOrder().getExecutionInfo()
-        print "%s: BUY at $%.2f" % (execInfo.getDateTime(), execInfo.getPrice())
+        position.setExitOnSessionClose(True)
+        print "%s: BUY %d of %s at $%.2f" % (execInfo.getDateTime(), position.getQuantity(),
+        																		 position.getInstrument(), execInfo.getPrice())
 
     def onEnterCanceled(self, position):
         self.__position = None
 
     def onExitOk(self, position):
         execInfo = position.getExitOrder().getExecutionInfo()
-        print "%s: SELL at $%.2f" % (execInfo.getDateTime(), execInfo.getPrice())
+        print "%s: SELL %d of %s at $%.2f profit: %f" % (execInfo.getDateTime(), position.getQuantity(),
+        																		 position.getInstrument(), execInfo.getPrice(), position.getQuantity() * position.getNetProfit())
         self.__position = None
 
     def onExitCanceled(self, position):
@@ -68,13 +69,16 @@ class PairStrategy(strategy.Strategy):
         # If a position was not opened, check if we should enter a long position.
         if self.__position == None:
             if self.cross_below.getValue() > 0:
-                print 'More Inside'
-                # Enter a buy market order for 10 orcl shares. The order is good till canceled.
-                self.__position = self.enterLong(self.__tick1, 10, True)
+                self.__position = self.enterLong(self.__tick1, int(.9 * (self.getBroker().getCash() / bar.getClose())), True)
         # Check if we have to exit the position.
-        elif self.cross_above.getValue() > 0:
-             self.exitPosition(self.__position)
-
+        elif self.cross_above.getValue() > 0:   
+            if self.__position != None:self.exitPosition(self.__position)
+            self.__position = self.enterLong(self.__tick2, int(.9 * (self.getBroker().getCash() / bar.getClose())), True)
+        elif self.cross_below.getValue() > 0:
+            if self.__position != None:
+            	print 'hello', bar.getDateTime()
+            	self.exitPosition(self.__position)
+            self.__position = self.enterLong(self.__tick1, int(.9 * (self.getBroker().getCash() / bar.getClose())), True)
     def onFinish(self, bars):
         print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
 
@@ -82,10 +86,19 @@ def run_strategy(smaPeriod, tick, tick2='TRNS'):
     # Load the yahoo feed from the CSV file
     feed = mongofeed.MongoFeed()
     feed.addBarsFromCSV(tick, mongofeed.MongoRowParser())
-    f = du.ArbiFeed()
+    ratio = du.get_ratio_for_key_with_date(tick, tick2, 'Adj Clos')
 
+    f = du.ArbiFeed()
+    f.addBarsFromCSV(ratio, '%s/%s' %(tick, tick2))
+    f.addBarsFromCSV(du.get_data(tick), tick)
+    f.addBarsFromCSV(du.get_data(tick), tick2)   
+    
     # Evaluate the strategy with the feed's bars.
     myStrategy = PairStrategy(feed, smaPeriod, f, tick, 'TRNS')
-    myStrategy.run()
+    plt = plotter.StrategyPlotter(myStrategy)
+    plt.getInstrumentSubplot(tick).addDataSeries(tick, f.getDataSeries(tick))
 
-run_strategy(150, sys.argv[1])
+    myStrategy.run()
+    plt.plot()
+
+run_strategy(7, sys.argv[1])
