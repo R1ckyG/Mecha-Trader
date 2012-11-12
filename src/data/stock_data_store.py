@@ -39,7 +39,7 @@ class StockDataStore(object):
     data = data_fetcher.get_data(company, start_date, end_date)
     self.store(company, data)
   
-  def get_company_data(self, company, start_date=None, end_date=None):
+  def get_company_data(self, company, start_date=None, end_date=None, retry=True):
     collection = self.db[company]
     start = None if start_date is None else start_date
     end = None if end_date is None else end_date
@@ -55,6 +55,10 @@ class StockDataStore(object):
     else:
        data = collection.find({'$and':[{'date':{'$gte':start_date}},
                                {'date':{'$lte':end_date}}]}).sort('date')
+    if data.count() == 0 and retry:
+      end_date = datetime.datetime.now()
+      self.fetch_and_store( company, START_DATE, end_date.strftime('%Y%m%d'))
+      self.get_company_data(company, datetime.datetime.strptime(START_DATE, '%Y%m%d'), end_date, False)
     return data
 
   def batch_fetch(self, ticker_file, start_date=START_DATE):

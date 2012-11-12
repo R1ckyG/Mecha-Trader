@@ -10,15 +10,15 @@ import sys, numpy as np
 
 class PairStrategy(strategy.Strategy):
     def __init__(self, feed, smaPeriod, f, tick1, tick2):
-        strategy.Strategy.__init__(self, f, 8000)
-        self.__position = None
+        strategy.Strategy.__init__(self, f, 15000)
+        self.__position = {} 
         self.__tick1 = tick1
         self.__tick2 = tick2
         self.pdata = feed.getDataSeries(tick1).getCloseDataSeries()
 
         def get_ratio(bar):
           return bar.ratio
-        self.ratios = f.getDataSeries('%s/%s' %(tick1, tick2)), dir(f)
+        self.ratios = f.getDataSeries('%s/%s' %(tick1, tick2))
         self.ratios = dataseries.BarValueDataSeries(f.getDataSeries('%s/%s' %(tick1, tick2)), get_ratio)
         self.ratio_series = du.RatioDataSeries(tick1, tick2, 'Adj Clos')
         a, b, c = du.run_command(
@@ -35,8 +35,8 @@ class PairStrategy(strategy.Strategy):
         self.mids = du.ArbitraryDataSeries('Mean', b.tolist())
         self.lows = du.ArbitraryDataSeries('Lower BBand', c.tolist()) 
         """
-        self.cross_below = cross.CrossBelow(self.ratios, self.highs)
-        self.cross_above = cross.CrossAbove(self.ratios, self.mids)
+        self.cross_below = cross.CrossBelow(self.ratios, self.lows)
+        self.cross_above = cross.CrossAbove(self.ratios, self.highs)
       
             
     def onStart(self):
@@ -55,7 +55,7 @@ class PairStrategy(strategy.Strategy):
         execInfo = position.getExitOrder().getExecutionInfo()
         print "%s: SELL %d of %s at $%.2f profit: %f" % (execInfo.getDateTime(), position.getQuantity(),
         																		 position.getInstrument(), execInfo.getPrice(), position.getQuantity() * position.getNetProfit())
-        self.__position = None
+        #self.__position = None
 
     def onExitCanceled(self, position):
         # If the exit was canceled, re-submit it.
@@ -67,18 +67,23 @@ class PairStrategy(strategy.Strategy):
             return
         bar = bars.getBar(self.__tick1)
         # If a position was not opened, check if we should enter a long position.
-        if self.__position == None:
+        if len(self.__position) == 0:
             if self.cross_below.getValue() > 0:
-                self.__position = self.enterLong(self.__tick1, int(.9 * (self.getBroker().getCash() / bar.getClose())), True)
+                order = int(.9 * (self.getBroker().getCash() / bar.getClose()))
+                if self.__tick1 not in self.__position: self.__position[self.__tick1] = self.enterLong(self.__tick1, order, True)
         # Check if we have to exit the position.
         elif self.cross_above.getValue() > 0:   
-            if self.__position != None:self.exitPosition(self.__position)
-            self.__position = self.enterLong(self.__tick2, int(.9 * (self.getBroker().getCash() / bar.getClose())), True)
+            bar = bars.getBar(self.__tick2)
+            order = int(.9 * (self.getBroker().getCash() / bar.getClose()))
+            if self.__tick1 in self.__position:self.exitPosition(self.__position.pop(self.__tick1))
+            if self.__tick2 not in self.__position:self.__position[self.__tick2] = self.enterLong(self.__tick2, order, True)
         elif self.cross_below.getValue() > 0:
-            if self.__position != None:
+            if self.__tick2 in self.__position:
             	print 'hello', bar.getDateTime()
-            	self.exitPosition(self.__position)
-            self.__position = self.enterLong(self.__tick1, int(.9 * (self.getBroker().getCash() / bar.getClose())), True)
+            	self.exitPosition(self.__position.pop(self.__tick2))
+            order = int(.9 * (self.getBroker().getCash() / bar.getClose()))
+            if self.__tick1 not in self.__position:self.__position[self.__tick1] = self.enterLong(self.__tick1, order, True)
+    
     def onFinish(self, bars):
         print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
 
@@ -91,14 +96,14 @@ def run_strategy(smaPeriod, tick, tick2='TRNS'):
     f = du.ArbiFeed()
     f.addBarsFromCSV(ratio, '%s/%s' %(tick, tick2))
     f.addBarsFromCSV(du.get_data(tick), tick)
-    f.addBarsFromCSV(du.get_data(tick), tick2)   
+    f.addBarsFromCSV(du.get_data(tick2), tick2)   
     
     # Evaluate the strategy with the feed's bars.
-    myStrategy = PairStrategy(feed, smaPeriod, f, tick, 'TRNS')
+    myStrategy = PairStrategy(feed, smaPeriod, f, tick, tick2)
     plt = plotter.StrategyPlotter(myStrategy)
     plt.getInstrumentSubplot(tick).addDataSeries(tick, f.getDataSeries(tick))
 
     myStrategy.run()
     plt.plot()
 
-run_strategy(7, sys.argv[1])
+run_strategy(9, sys.argv[1], sys.argv[2])
