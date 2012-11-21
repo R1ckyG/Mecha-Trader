@@ -13,6 +13,7 @@ class BuyAndHold(strategy.Strategy):
         strategy.Strategy.__init__(self, f, 15000)
         self.__position = {} 
         self.tickers = tickers
+        self.result = None
             
     def onStart(self):
         print "Initial portfolio value: $%.2f" % self.getBroker().getCash()
@@ -46,6 +47,7 @@ class BuyAndHold(strategy.Strategy):
             self.__position[t] = self.enterLong(t, order, True)
     
     def onFinish(self, bars):
+        self.result = self.getBroker().getValue(bars)
         print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
 
 def run_strategy(smaPeriod, tickers):
@@ -63,5 +65,5 @@ def run_strategy(smaPeriod, tickers):
 
     myStrategy.run()
     plt.plot()
-
-run_strategy(9, sys.argv[1:])
+if __name__ == '__main__':
+  run_strategy(9, sys.argv[1:])

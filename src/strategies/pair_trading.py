@@ -15,7 +15,7 @@ class PairStrategy(strategy.Strategy):
         self.__tick1 = tick1
         self.__tick2 = tick2
         self.pdata = feed.getDataSeries(tick1).getCloseDataSeries()
-
+        self.result = None
         def get_ratio(bar):
           return bar.ratio
         self.ratios = f.getDataSeries('%s/%s' %(tick1, tick2))
@@ -85,7 +85,8 @@ class PairStrategy(strategy.Strategy):
             if self.__tick1 not in self.__position:self.__position[self.__tick1] = self.enterLong(self.__tick1, order, True)
     
     def onFinish(self, bars):
-        print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
+       self.result = self.getBroker().getValue(bars) 
+       print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
 
 def run_strategy(smaPeriod, tick, tick2='TRNS'):
     # Load the yahoo feed from the CSV file
@@ -105,5 +106,5 @@ def run_strategy(smaPeriod, tick, tick2='TRNS'):
 
     myStrategy.run()
     plt.plot()
-
-run_strategy(9, sys.argv[1], sys.argv[2])
+if __name__ == '__main__':
+  run_strategy(9, sys.argv[1], sys.argv[2])
