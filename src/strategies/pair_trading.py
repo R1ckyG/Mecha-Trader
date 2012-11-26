@@ -44,9 +44,9 @@ class PairStrategy(strategy.Strategy):
 
     def onEnterOk(self, position):
         execInfo = position.getEntryOrder().getExecutionInfo()
-        position.setExitOnSessionClose(True)
+        #position.setExitOnSessionClose(True)
         print "%s: BUY %d of %s at $%.2f" % (execInfo.getDateTime(), position.getQuantity(),
-        																		 position.getInstrument(), execInfo.getPrice())
+                                             position.getInstrument(), execInfo.getPrice())
 
     def onEnterCanceled(self, position):
         self.__position = None
@@ -54,7 +54,7 @@ class PairStrategy(strategy.Strategy):
     def onExitOk(self, position):
         execInfo = position.getExitOrder().getExecutionInfo()
         print "%s: SELL %d of %s at $%.2f profit: %f" % (execInfo.getDateTime(), position.getQuantity(),
-        																		 position.getInstrument(), execInfo.getPrice(), position.getQuantity() * position.getNetProfit())
+                                             position.getInstrument(), execInfo.getPrice(), position.getQuantity() * position.getNetProfit())
         #self.__position = None
 
     def onExitCanceled(self, position):
@@ -79,8 +79,8 @@ class PairStrategy(strategy.Strategy):
             if self.__tick2 not in self.__position:self.__position[self.__tick2] = self.enterLong(self.__tick2, order, True)
         elif self.cross_below.getValue() > 0:
             if self.__tick2 in self.__position:
-            	print 'hello', bar.getDateTime()
-            	self.exitPosition(self.__position.pop(self.__tick2))
+              print 'hello', bar.getDateTime()
+              self.exitPosition(self.__position.pop(self.__tick2))
             order = int(.9 * (self.getBroker().getCash() / bar.getClose()))
             if self.__tick1 not in self.__position:self.__position[self.__tick1] = self.enterLong(self.__tick1, order, True)
     
@@ -88,8 +88,9 @@ class PairStrategy(strategy.Strategy):
        self.result = self.getBroker().getValue(bars) 
        print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
 
-def run_strategy(smaPeriod, tick, tick2='TRNS'):
+def run_strategy(smaPeriod, tick, tick2='TRNS', plot=True):
     # Load the yahoo feed from the CSV file
+    plt = None
     feed = mongofeed.MongoFeed()
     feed.addBarsFromCSV(tick, mongofeed.MongoRowParser())
     ratio = du.get_ratio_for_key_with_date(tick, tick2, 'Adj Clos')
@@ -101,10 +102,12 @@ def run_strategy(smaPeriod, tick, tick2='TRNS'):
     
     # Evaluate the strategy with the feed's bars.
     myStrategy = PairStrategy(feed, smaPeriod, f, tick, tick2)
-    plt = plotter.StrategyPlotter(myStrategy)
-    plt.getInstrumentSubplot(tick).addDataSeries(tick, f.getDataSeries(tick))
+    if plot:plt = plotter.StrategyPlotter(myStrategy)
+    if plot:plt.getInstrumentSubplot(tick).addDataSeries(tick, f.getDataSeries(tick))
 
     myStrategy.run()
-    plt.plot()
+    if plot:plt.plot()
+    return myStrategy.result
+
 if __name__ == '__main__':
-  run_strategy(9, sys.argv[1], sys.argv[2])
+  run_strategy(int(sys.argv[3]), sys.argv[1], sys.argv[2])

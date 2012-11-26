@@ -50,20 +50,22 @@ class BuyAndHold(strategy.Strategy):
         self.result = self.getBroker().getValue(bars)
         print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
 
-def run_strategy(smaPeriod, tickers):
+def run_strategy(smaPeriod, tickers, plot=True):
     # Load the yahoo feed from the CSV file
-
+    plt = None
     f = du.ArbiFeed()
     for t in tickers:
       f.addBarsFromCSV(du.get_data(t), t)
     
     # Evaluate the strategy with the feed's bars.
     myStrategy = BuyAndHold(smaPeriod, f, tickers)
-    plt = plotter.StrategyPlotter(myStrategy)
+    if plot: plt = plotter.StrategyPlotter(myStrategy)
     for t in tickers:
-      plt.getInstrumentSubplot(t).addDataSeries(t, f.getDataSeries(t))
+      if plot:plt.getInstrumentSubplot(t).addDataSeries(t, f.getDataSeries(t))
 
     myStrategy.run()
-    plt.plot()
+    if plot: plt.plot()
+    return myStrategy.result
+
 if __name__ == '__main__':
   run_strategy(9, sys.argv[1:])

@@ -5,7 +5,7 @@ from rpy2 import robjects as ro
 from rpy2.robjects import r
 from rpy2.robjects.packages import importr
 import lib.talib as tl
-import anaylsis.model_learning as ml
+import analysis.model_learning as ml
 import data.stock_data_store as sd
 import numpy as np
 import utils.data_util as du
