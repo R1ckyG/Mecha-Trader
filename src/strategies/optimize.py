@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys, argparse 
-import pair_trading, buy_and_hold, utils.data_util as du
+import pair_trading, buy_and_hold, trending
+import utils.data_util as du
 
 def get_argument_parser():
   parser = argparse.ArgumentParser()
@@ -12,6 +13,7 @@ def get_argument_parser():
                     dest='upper_limit', default=100, action='store')
   parser.add_argument('-t', '--tickers', help='Tickers for companies to run separated by space',
                     dest='tickers', nargs='*', action='append')
+  parser.add_argument('-f', '--file', help='File',dest='tfile',  action='store')
   return parser
 
 def getStrategy(type):
@@ -19,19 +21,25 @@ def getStrategy(type):
     return buy_and_hold
   elif type.lower() == 'pair_trading':
     return pair_trading
+  elif type.lower() == 'trending':
+    return trending
 
 class Optimizer:
   def __init__(self, strgy, tickers, lower=1, upper=100):
-    self.lower = lower
-    self.upper = upper
+    self.lower = int(lower)
+    self.upper = int(upper)
     self.strategy = strgy
     self.tickers = tickers
   
   def run(self):
     trials = []
     for i in range(self.lower, self.upper):
+      print (25 * '--') + ('Running trial for %d period' % i) + (25 * '--')
       try:
-        strat = self.strategy.run_strategy(i, *self.tickers, plot=False)
+        if self.strategy == trending:
+          strat = self.strategy.run_strategy(i, self.tickers, plot=False)
+        else:
+          strat = self.strategy.run_strategy(i, *self.tickers, plot=False)
         trials.append((strat, i))
       except Exception, e:
         print e, self.tickers, i
@@ -42,7 +50,13 @@ if __name__ =='__main__':
   args = parser.parse_args()
   print args, args.strategy
   strat = getStrategy(args.strategy)
-  opti = Optimizer(strat, args.tickers[0], args.lower_limit, args.upper_limit)
+  tickers = None
+  if args.tfile:
+    f = open(args.tfile, 'r')
+    tickers = [line.strip() for line in f]
+  else:
+    tickers = args.tickers[0]
+  opti = Optimizer(strat, tickers, args.lower_limit, args.upper_limit)
   t = opti.run()
   print t
 
