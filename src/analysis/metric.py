@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 from __future__ import division
 
+DEBUG = False
+
 class Metrics:
   def __init__(self):
     self.neg_returns = {}
@@ -10,13 +12,45 @@ class Metrics:
     self.day_pos_roc = {}
     self.tset = set()
     self.daily_roc = {} 
+  
+  @property
+  def init_balance(self):
+    return self.init_balance
+  
+  @init_balance.setter
+  def init_balance(self, value):
+    self.init_balance = value
+  
+  @property
+  def final_balance(self):
+    return self.final_balance
+  
+  @final_balance.setter
+  def final_balance(self, value):
+    self.final_balance = value
 
-  def log_neg_returns(self, ticker, date, profit):
+  @property
+  def start_date(self):
+    return self.start_date
+  
+  @start_date.setter
+  def start_date(self, value):
+    self.start_date = value
+  
+  @property
+  def end_date(self):
+    return self.end_date
+  
+  @end_date.setter
+  def end_date(self, value):
+    self.end_date = value
+
+  def log_pos_returns(self, ticker, date, profit):
     self.tset.add(ticker)
     self.pos_returns.setdefault(ticker, [])
     self.pos_returns[ticker].append((date, profit))
   
-  def log_pos_returns(self, ticker, date, profit):
+  def log_neg_returns(self, ticker, date, profit):
     self.neg_returns.setdefault(ticker, [])
     self.tset.add(ticker)
     self.neg_returns[ticker].append((date, profit))
@@ -118,6 +152,7 @@ class Metrics:
 
   def get_max_drawdown(self, ticker):
     memoi = []
+    self.daily_roc.setdefault(ticker, [])
     for d in range(len(self.daily_roc[ticker])):
       if d == 0:
         memoi.append((self.daily_roc[ticker][d], [self.daily_roc[ticker][d]]))
@@ -128,9 +163,12 @@ class Metrics:
         memoi[d][1].append(self.daily_roc[ticker][d])
   
     maxdrawdown = 0
+    sequence = None
     for d in memoi:
       if d[0] < maxdrawdown:
         maxdrawdown = d[0]
+        sequence = d[1]
+    if DEBUG: print 'Sequence %s \n%r %f' % (ticker, sequence, maxdrawdown)
     return maxdrawdown
 
   def get_all_drawdown(self):
@@ -140,8 +178,9 @@ class Metrics:
     return output
 
   def get_num_winning_trade(self, ticker):
-    wins = len(self.pos_returns)
-    num_of_trades = wins + len(self.neg_returns)
+    if ticker not in self.pos_returns or ticker not in self.neg_returns: return
+    wins = len(self.pos_returns[ticker])
+    num_of_trades = wins + len(self.neg_returns[ticker])
     return 100 * (wins/num_of_trades)
  
   def get_all_win(self):
@@ -151,8 +190,9 @@ class Metrics:
     return output
 
   def get_num_losing_trade(self, ticker):
-    wins = len(self.neg_returns)
-    num_of_trades = wins + len(self.pos_returns)
+    if ticker not in self.pos_returns or ticker not in self.neg_returns: return
+    wins = len(self.neg_returns[ticker])
+    num_of_trades = wins + len(self.pos_returns[ticker])
     return 100 * (wins/num_of_trades)
 
   def get_all_losses(self):
@@ -175,15 +215,29 @@ class Metrics:
 
   def avg_gain(self, ticker):
     total = 0
+    if ticker not in self.pos_returns: return
     for pos in self.pos_returns[ticker]:
       total = total + pos[1]
     return total / self.get_num_of_ups(ticker)
 
+  def get_all_gain(self):
+    output = {}
+    for ticker in self.tset:
+      output[ticker] = self.avg_gain(ticker)
+    return output
+  
   def avg_losses(self, ticker):
     total = 0 
+    if ticker not in self.neg_returns: return
     for pos in self.neg_returns[ticker]:
       total = total + pos[1]
     return total / self.get_num_of_downs(ticker)
+
+  def get_all_avglosses(self):
+    output = {}
+    for ticker in self.tset:
+      output[ticker] = self.avg_losses(ticker)
+    return output
 
   def get_gain_loss_ratio(self, ticker):
     return self.avg_gain(ticker) / self.avg_losses(ticker)
@@ -194,4 +248,11 @@ class Metrics:
   def get_daily_losses(self, ticker):
     return len(self.day_neg_roc[ticker])
   
-
+  def get_portfolio_annualized_returns(self):
+    gain = self.final_balance / self.init_balance
+    tdiff = self.end_date - self.start_date
+    years = tdiff.days / 365
+    months = years * 12
+    print (gain ** (12/months)), months
+    gain = (gain ** (12/months)) - 1
+    return gain * 100

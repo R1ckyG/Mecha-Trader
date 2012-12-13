@@ -10,7 +10,7 @@ import sys, numpy as np, logging
 from analysis import metric
 
 logging.root.setLevel(logging.INFO)
-LOWERLIMIT = 50
+LOWERLIMIT = 10
 metrics = metric.Metrics()
 
 class TrendingStrategy(strategy.Strategy):
@@ -25,20 +25,34 @@ class TrendingStrategy(strategy.Strategy):
     self.last_price = {}
     if LOWERLIMIT >= len(tickers):
       LOWERLIMIT = int(len(tickers) * .5)
+    max_date = min_date = None
     for ticker in tickers:
       data = du.get_data(ticker)
       feed.addBarsFromCSV(ticker, mongofeed.MongoRowParser())
+      if max_date == None:
+        max_date = data[-1]['date']
+      elif max_date < data[-1]['date']:
+        max_date = data[-1]['date']
+
+      if min_date == None:
+        min_date = data[0]['date']
+      elif min_date > data[0]['date']:
+        min_date = data[0]['date']      
       self.trend_data[ticker] = rsi.RSI(feed.getDataSeries(ticker).getAdjCloseDataSeries(), smaPeriod)
+    print 'start: %r end: %r' %(min_date, max_date)
+    metrics.start_date = min_date
+    metrics.end_date = max_date
   
   def onStart(self):
     print 'Initial portfolio value: %.2f' % self.getBroker().getCash()
+    metrics.init_balance = self.getBroker().getCash()
   
   def onEnterCanceled(self, position):
     self.__position = None
   
   def onExitOk(self, position):
     execInfo = position.getExitOrder().getExecutionInfo()
-    net_profit = position.getNetProfit()
+    net_profit = position.getResult()
     inst = position.getInstrument()
     date = execInfo.getDateTime()
     if net_profit > 0:
@@ -57,6 +71,7 @@ class TrendingStrategy(strategy.Strategy):
   
   def onFinish(self, bars):
     self.result = self.getBroker().getValue(bars) 
+    metrics.final_balance = self.result
     print "Final portfolio value: $%.2f" % self.getBroker().getValue(bars)
   
   def exitAll(self):
@@ -138,17 +153,25 @@ def run_strategy(period,  tickers, trend='RSI', plot=True):
   plt = None
   feed = mongofeed.MongoFeed()
   trs = TrendingStrategy(feed, period, tickers, trend)
-  if plot:plt = plotter.StrategyPlotter(trs)
+  if plot:plt = plotter.StrategyPlotter(trs, False, False)
   if plot:
     for tick in tickers:
+      continue
       plt.getInstrumentSubplot(tick).addDataSeries(tick, feed.getDataSeries(tick))
   trs.run()
   if plot:plt.plot()
   dd = metrics.get_all_drawdown()
-  print 'drawdown: \n%r' % (dd)
+  winners = metrics.get_all_win()
+  losers = metrics.get_all_losses()
+  avg_gain = metrics.get_all_gain()
+  avg_losses = metrics.get_all_avglosses()
+  returns = metrics.get_portfolio_annualized_returns()
+  print 'drawdown: \n%r' % (dd), 'Win percentage: \n%r ' % (winners), 'Loss perc.: \n%r' % (losers)
+  print 'Gains: \n%r' % (avg_gain), 'Losses: \n%r' % (avg_losses)
+  print 'Returns: %f' % (returns)
   return trs.result
 
 if __name__ == '__main__':
   f = open(sys.argv[3])
   tickers = [line.strip() for line in f]
-  run_strategy(int(sys.argv[1]),  tickers, sys.argv[2],plot=False) 
+  run_strategy(int(sys.argv[1]),  tickers, sys.argv[2],plot=True) 
