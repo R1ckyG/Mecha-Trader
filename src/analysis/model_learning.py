@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import feature_extractor as fe
+from data import feature_extractor as fe
 from sklearn.feature_extraction import DictVectorizer as dv
 import numpy as np
 from sklearn.grid_search import GridSearchCV as gs

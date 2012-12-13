@@ -7,9 +7,11 @@ from data import mongofeed
 from pyalgotrade.dataseries import BarValueDataSeries
 from utils import data_util as du
 import sys, numpy as np, logging
+from analysis import metric
 
 logging.root.setLevel(logging.INFO)
-LOWERLIMIT = 10
+LOWERLIMIT = 50
+metrics = metric.Metrics()
 
 class TrendingStrategy(strategy.Strategy):
   def __init__(self, feed, smaPeriod, tickers, trend_indicator):
@@ -20,6 +22,7 @@ class TrendingStrategy(strategy.Strategy):
     self.trend_indi = trend_indicator  
     self.trend_data  = {}
     self.positions = []
+    self.last_price = {}
     if LOWERLIMIT >= len(tickers):
       LOWERLIMIT = int(len(tickers) * .5)
     for ticker in tickers:
@@ -35,6 +38,14 @@ class TrendingStrategy(strategy.Strategy):
   
   def onExitOk(self, position):
     execInfo = position.getExitOrder().getExecutionInfo()
+    net_profit = position.getNetProfit()
+    inst = position.getInstrument()
+    date = execInfo.getDateTime()
+    if net_profit > 0:
+      metrics.log_pos_returns(inst, date, net_profit)
+    else:
+      metrics.log_neg_returns(inst, date, net_profit)
+    
     print "%s: SELL %d of %s at $%.2f profit: %f" %\
                   (execInfo.getDateTime(), position.getQuantity(),
                   position.getInstrument(), execInfo.getPrice(), 
@@ -100,7 +111,13 @@ class TrendingStrategy(strategy.Strategy):
       self.positions.remove(p)
     
     self.exitSelected(exited)
+    if valid_options[:index] > 0: metrics.extend_period()
     for pair in valid_options[:index]:
+      self.last_price.setdefault(pair[0], None)
+      if self.last_price[pair[0]]:
+        metrics.log_day_roc(pair[0], (pair[2].getClose() - self.last_price[pair[0]]) 
+                                / self.last_price[pair[0]])
+      if pair[2]: self.last_price[pair[0]] = pair[2].getClose()
       order = (1/LOWERLIMIT) * self.getBroker().getCash()
       if pair[2] == None:continue
       order = int(order / pair[2].getClose())
@@ -110,6 +127,7 @@ class TrendingStrategy(strategy.Strategy):
     #self.enterSelected(valid_options[:index])'
 
   def onEnterOk(self, position):
+    
     execInfo = position.getEntryOrder().getExecutionInfo()
     print "%s: BUY %d of %s at $%.2f" %\
                       (execInfo.getDateTime(), position.getQuantity(),
@@ -126,6 +144,8 @@ def run_strategy(period,  tickers, trend='RSI', plot=True):
       plt.getInstrumentSubplot(tick).addDataSeries(tick, feed.getDataSeries(tick))
   trs.run()
   if plot:plt.plot()
+  dd = metrics.get_all_drawdown()
+  print 'drawdown: \n%r' % (dd)
   return trs.result
 
 if __name__ == '__main__':
