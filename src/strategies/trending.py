@@ -142,7 +142,6 @@ class TrendingStrategy(strategy.Strategy):
     #self.enterSelected(valid_options[:index])'
 
   def onEnterOk(self, position):
-    
     execInfo = position.getEntryOrder().getExecutionInfo()
     print "%s: BUY %d of %s at $%.2f" %\
                       (execInfo.getDateTime(), position.getQuantity(),
