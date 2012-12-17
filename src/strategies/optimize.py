@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys, argparse 
-import pair_trading, buy_and_hold, trending
+import pair_trading, buy_and_hold, trending, bband_trender
 import utils.data_util as du
 
 def get_argument_parser():
@@ -23,6 +23,8 @@ def getStrategy(type):
     return pair_trading
   elif type.lower() == 'trending':
     return trending
+  elif type.lower() == 'bband':
+  	return bband_trender
 
 class Optimizer:
   def __init__(self, strgy, tickers, lower=1, upper=100):
@@ -36,7 +38,7 @@ class Optimizer:
     for i in range(self.lower, self.upper):
       print (25 * '--') + ('Running trial for %d period' % i) + (25 * '--')
       try:
-        if self.strategy == trending:
+        if self.strategy == trending or self.strategy == bband_trender:
           strat = self.strategy.run_strategy(i, self.tickers, plot=False)
         else:
           strat = self.strategy.run_strategy(i, *self.tickers, plot=False)

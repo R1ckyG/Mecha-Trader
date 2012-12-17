@@ -256,3 +256,7 @@ class Metrics:
     print (gain ** (12/months)), months
     gain = (gain ** (12/months)) - 1
     return gain * 100
+	
+	def build_comp_report(self, ticker, file):
+		"""build report for a company"""
+		return None
