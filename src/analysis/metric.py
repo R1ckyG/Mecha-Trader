@@ -259,4 +259,12 @@ class Metrics:
 	
 	def build_comp_report(self, ticker, file):
 		"""build report for a company"""
+		report_str = ''
+		for ticker in self.tset:
+			report_str = report_str + ticker + '\t'
+		
+		report_str = report_str + '\nWinning Trades:'
+		for ticker in self.tset:
+			report_str = report_str + self.
+		
 		return None
