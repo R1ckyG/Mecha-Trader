@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import division
+import operator
 
 DEBUG = False
 
@@ -127,7 +128,7 @@ class Metrics:
   def get_max_dp(self, ticker):
     """Function returning max daily profit"""
     biggest = 0
-    for d in elf.day_pos_roc[ticker]:
+    for d in self.day_pos_roc[ticker]:
       biggest = max(biggest, d)
     return biggest
 
@@ -177,10 +178,15 @@ class Metrics:
       output[t] = self.get_max_drawdown(t)
     return output
 
-  def get_num_winning_trade(self, ticker):
-    if ticker not in self.pos_returns or ticker not in self.neg_returns: return
+  def get_num_winning_trade(self, ticker, normalize=False):
+    if ticker not in self.pos_returns or ticker not in self.neg_returns: return 0
     wins = len(self.pos_returns[ticker])
     num_of_trades = wins + len(self.neg_returns[ticker])
+    if normalize:
+      end = int(wins * .95)
+      l = sorted(self.pos_returns[ticker], key=operator.itemgetter(1))
+      wins = len(l[:end])
+      num_of_trades = end + len(self.neg_returns[ticker])
     return 100 * (wins/num_of_trades)
  
   def get_all_win(self):
@@ -189,10 +195,15 @@ class Metrics:
       output[t] = self.get_num_winning_trade(t)
     return output
 
-  def get_num_losing_trade(self, ticker):
-    if ticker not in self.pos_returns or ticker not in self.neg_returns: return
+  def get_num_losing_trade(self, ticker, normalize=False):
+    if ticker not in self.pos_returns or ticker not in self.neg_returns: return 0
     wins = len(self.neg_returns[ticker])
     num_of_trades = wins + len(self.pos_returns[ticker])
+    
+    if normalize:
+      end = int(len(self.pos_returns[ticker]) * .95)
+      l = sorted(self.pos_returns[ticker], key=operator.itemgetter(1))
+      num_of_trades = wins + len(l[:end])
     return 100 * (wins/num_of_trades)
 
   def get_all_losses(self):
@@ -201,24 +212,36 @@ class Metrics:
       output[t] = self.get_num_losing_trade(t)
     return output
 
+  #FIX  
   def get_num_of_ups(self, ticker):
     return len(self.pos_returns[ticker])
 
+  #FIX
   def get_num_of_downs(self, ticker):
     return len(self.neg_returns[ticker])
 
   def get_num_transactions(self, ticker):
-    return len(self.neg_returns[ticker]) + len(self.pos_returns[ticker])
+    return 2 * (len(self.neg_returns[ticker]) + len(self.pos_returns[ticker]))
   
   def get_total_days(self, ticker):
     return len(self.daily_roc[ticker])
 
-  def avg_gain(self, ticker):
+  def avg_gain(self, ticker, normalize=False):
     total = 0
-    if ticker not in self.pos_returns: return
-    for pos in self.pos_returns[ticker]:
-      total = total + pos[1]
-    return total / self.get_num_of_ups(ticker)
+    v = 0
+    if ticker not in self.pos_returns: return 0
+    if normalize:
+      l = sorted(self.pos_returns[ticker], key=operator.itemgetter(1))
+      end = max(int(len(l) - (len(l) * .05)), 1)
+      l = l[:end]
+      for pos in l:
+        total = total + pos[1]
+      v = total / len(l)
+    else:
+      for pos in self.pos_returns[ticker]:
+        total = total + pos[1]
+      v = total / len(self.pos_returns[ticker])
+    return v
 
   def get_all_gain(self):
     output = {}
@@ -226,12 +249,21 @@ class Metrics:
       output[ticker] = self.avg_gain(ticker)
     return output
   
-  def avg_losses(self, ticker):
-    total = 0 
-    if ticker not in self.neg_returns: return
-    for pos in self.neg_returns[ticker]:
-      total = total + pos[1]
-    return total / self.get_num_of_downs(ticker)
+  def avg_losses(self, ticker, normalize=False):
+    total = 0
+    v = 0 
+    if ticker not in self.neg_returns: return 0
+    if normalize:
+      l = sorted(self.neg_returns[ticker], key=operator.itemgetter(1))
+      l = l[:len(l) - (len(l) * .05)]
+      for pos in l:
+        total = total + pos[1]
+      v = total / len(l)
+    else:
+      for pos in self.neg_returns[ticker]:
+        total = total + pos[1]
+      v = total / len(self.neg_returns[ticker])
+    return v
 
   def get_all_avglosses(self):
     output = {}
@@ -247,6 +279,21 @@ class Metrics:
 
   def get_daily_losses(self, ticker):
     return len(self.day_neg_roc[ticker])
+    
+  def get_profit_factor(self, ticker, normalize=False):
+    win_factor = self.get_num_winning_trade(ticker, normalize=normalize) * self.avg_gain(ticker, normalize=normalize)
+    loss_factor = -1 * self.get_num_losing_trade(ticker, normalize=normalize) * self.avg_losses(ticker)
+    v = 0
+    try:
+    	v = win_factor / loss_factor
+    except:
+    	print 'Uh oh: %s' % (ticker)
+    return v
+  
+  def get_expected_gain(self, ticker, normalize=False):
+    win_factor = self.get_num_winning_trade(ticker, normalize=normalize) * self.avg_gain(ticker, normalize=normalize)
+    loss_factor = self.get_num_losing_trade(ticker, normalize=normalize) * self.avg_losses(ticker)
+    return win_factor - loss_factor
   
   def get_portfolio_annualized_returns(self):
     gain = self.final_balance / self.init_balance
@@ -256,15 +303,45 @@ class Metrics:
     print (gain ** (12/months)), months
     gain = (gain ** (12/months)) - 1
     return gain * 100
-	
-	def build_comp_report(self, ticker, file):
-		"""build report for a company"""
-		report_str = ''
-		for ticker in self.tset:
-			report_str = report_str + ticker + '\t'
-		
-		report_str = report_str + '\nWinning Trades:'
-		for ticker in self.tset:
-			report_str = report_str + self.
-		
-		return None
+
+  def build_comp_report(self, file):
+    """build report for a company"""
+    report_str = 'Tickers:\t'
+    for ticker in self.tset:
+      report_str = report_str + ticker + '\t'
+    report_str = report_str + '\nWinning Trades(%):\t'
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.get_num_winning_trade(ticker)) + '\t'
+    
+    report_str = report_str + '\nLosing Trades(%):\t' 
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.get_num_losing_trade(ticker)) + '\t'
+    
+    report_str = report_str + '\nAvg. Gain:\t'
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.avg_gain(ticker)) + '\t'
+    
+    report_str = report_str + '\nAvg. Loss:\t'
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.avg_losses(ticker)) + '\t'
+    
+    report_str = report_str + '\nProfit Factor:\t'
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.get_profit_factor(ticker)) + '\t'
+    
+    report_str = report_str + '\nExpected Gain:\t'
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.get_expected_gain(ticker)) + '\t'
+    
+    report_str = report_str + '\nNormalized Profit Factor:\t'
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.get_profit_factor(ticker, normalize=True)) + '\t'
+    
+    report_str = report_str + '\nNormalized Expected Gain:\t'
+    for ticker in self.tset:
+      report_str = report_str + '%.3f' % (self.get_expected_gain(ticker, normalize=True)) + '\t'
+    
+    f = open(file, 'w')
+    f.write(report_str)
+    f.close()
+  

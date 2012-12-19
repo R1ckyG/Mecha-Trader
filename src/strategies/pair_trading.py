@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 from pyalgotrade import strategy, dataseries, plotter
 from pyalgotrade.barfeed import yahoofeed
-from pyalgotrade.technical import ma
-from pyalgotrade.technical import cross
+from pyalgotrade.technical import ma, cross, trend
 from data import mongofeed
 from pyalgotrade.dataseries import BarValueDataSeries
 from utils import data_util as du
@@ -45,6 +44,10 @@ class PairStrategy(strategy.Strategy):
         """
         self.cross_below = cross.CrossBelow(self.ratios, self.lows)
         self.cross_above = cross.CrossAbove(self.ratios, self.highs)
+        self.cautious_cross_below = cross.CrossBelow(self.ratios, self.highs)
+        self.cautious_cross_above = cross.CrossAbove(self.ratios, self.highs)
+        self.price_slope = trend.Slope(self.ratios, smaPeriod)
+        self.last_slope = 0
       
             
     def onStart(self):
@@ -54,8 +57,8 @@ class PairStrategy(strategy.Strategy):
     def onEnterOk(self, position):
         execInfo = position.getEntryOrder().getExecutionInfo()
         #position.setExitOnSessionClose(True)
-        print "%s: BUY %d of %s at $%.2f" % (execInfo.getDateTime(), position.getQuantity(),
-                                             position.getInstrument(), execInfo.getPrice())
+        print "%s: BUY %d of %s at $%.2f slope: %f" % (execInfo.getDateTime(), position.getQuantity(),
+                                             position.getInstrument(), execInfo.getPrice(), self.last_slope)
 
     def onEnterCanceled(self, position):
         self.__position = None
@@ -69,8 +72,9 @@ class PairStrategy(strategy.Strategy):
           metrics.log_pos_returns(inst, date, net_profit)
         else:
           metrics.log_neg_returns(inst, date, net_profit)
-        print "%s: SELL %d of %s at $%.2f profit: %f" % (execInfo.getDateTime(), position.getQuantity(),
-                                             position.getInstrument(), execInfo.getPrice(), position.getQuantity() * position.getNetProfit())
+        print "%s: SELL %d of %s at $%.2f profit: %f slope: %f" % (execInfo.getDateTime(), position.getQuantity(),
+                                             position.getInstrument(), execInfo.getPrice(), position.getQuantity() * position.getNetProfit()
+                                             ,self.last_slope)
         #self.__position = None
 
     def onExitCanceled(self, position):
@@ -82,7 +86,7 @@ class PairStrategy(strategy.Strategy):
         if self.cross_below is None:
             return
         metrics.extend_period()
-        
+        self.last_slope = self.price_slope.getValue()
         bar = bars.getBar(self.__tick1)
         bar2 = bars.getBar(self.__tick2)
         
@@ -168,6 +172,7 @@ def run_strategy(smaPeriod, tick, tick2='TRNS', plot=True):
     avg_gain = metrics.get_all_gain()
     avg_losses = metrics.get_all_avglosses()
     returns = metrics.get_portfolio_annualized_returns()
+    metrics.build_comp_report('%s-%s-pair_trading.txt' % (tick, tick2))
     print 'drawdown: \n%r' % (dd), 'Win percentage: \n%r ' % (winners), 'Loss perc.: \n%r' % (losers)
     print 'Gains: \n%r' % (avg_gain), 'Losses: \n%r' % (avg_losses)
     print 'Returns: %f' % (returns)
