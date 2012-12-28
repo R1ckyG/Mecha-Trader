@@ -167,7 +167,7 @@ def run_strategy(period,  tickers, trend='RSI', plot=True):
   returns = metrics.get_portfolio_annualized_returns()
   metrics.build_comp_report('%s-trending.txt' % (trend))
   print 'drawdown: \n%r' % (dd), 'Win percentage: \n%r ' % (winners), 'Loss perc.: \n%r' % (losers)
-  print 'Gains: \n%r' % (avg_gain), 'Losses: \n%r' % (avg_losses)
+  print 'Gains: \n%r' % (avg_gain), '\nLosses: \n%r' % (avg_losses)
   print 'Returns: %f' % (returns)
   return trs.result
 
