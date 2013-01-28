@@ -202,7 +202,7 @@ def run_strategy(period,  tickers, trend='RSI', plot=True):
   metrics.build_comp_report('%s-%d-trending.txt' % (trend, LOWERLIMIT))
   print 'Failures: %r' % trs.failed
   print 'drawdown: \n%r' % (dd), 'Win percentage: \n%r ' % (winners), 'Loss perc.: \n%r' % (losers)
-  print 'Gains: \n%r' % (avg_gain), 'Losses: \n%r' % (avg_losses)
+  print 'Gains: \n%r' % (avg_gain), '\nLosses: \n%r' % (avg_losses)
   print 'Returns: %f' % (returns)
   print 'Total Transactions: %d' % metrics.num_transactions
   print 'Value: %f, Value - Commissions: %f' % (trs.result, trs.result - (metrics.num_transactions * 7))
