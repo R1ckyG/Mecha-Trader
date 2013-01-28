@@ -17,15 +17,15 @@ class StockDataStore(object):
   def store(self, company, data):
     data_list = list()
     labels = data.pop(YahooFinanceRetriever.FEATURES)
-    data_items = data.items()
-    print 'labels: ', labels
-    
+    data_items = data.items()    
     for datum in data_items:
-      data_list.append(self.format(labels, company, datum))
-      
+      try:
+        data_list.append(self.format(labels, company, datum))
+      except:
+        print 'Uh oh: %s' % (company)
     collection = self.db[company]
     collection.insert(data_list)
-  
+ 
   def format(self, labels, company, data):
     new_data = dict()
     for i in range(1, len(labels)):
@@ -34,7 +34,8 @@ class StockDataStore(object):
     new_data['date'] = datetime.datetime.strptime(data[0], '%Y-%m-%d') 
     return new_data
   
-  def fetch_and_store(self, company, start_date, end_date):
+  def fetch_and_store(self, company, start_date='20091002', end_date=None):
+    end_date = datetime.datetime.now().strftime('%Y%m%d') if not  end_date else end_date
     data_fetcher = YahooFinanceRetriever.YahooFinanceRetriever()
     data = data_fetcher.get_data(company, start_date, end_date)
     self.store(company, data)
@@ -57,6 +58,7 @@ class StockDataStore(object):
                                {'date':{'$lte':end_date}}]}).sort('date')
     if data.count() == 0 and retry:
       end_date = datetime.datetime.now()
+      print 'Fetching for ' + company
       self.fetch_and_store( company, START_DATE, end_date.strftime('%Y%m%d'))
       self.get_company_data(company, datetime.datetime.strptime(START_DATE, '%Y%m%d'), end_date, False)
     return data

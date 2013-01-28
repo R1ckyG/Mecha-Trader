@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 from __future__ import division
-import data.stock_data_store as sds, lib.talib as tl, numpy, sys, math
+import data.stock_data_store as sds, lib.talib as tl, numpy, sys, math, datetime
 from pyalgotrade.dataseries import DataSeries
 from pyalgotrade.barfeed import csvfeed
 from pyalgotrade import bar
 
-def get_data(ticker):
+def get_data(ticker, start_date=None, end_date=None):
   s = sds.StockDataStore()
-  cursor = s.get_company_data(ticker)
+  cursor = s.get_company_data(ticker, start_date, end_date)
   return [data for data in cursor]
 
 def get_ratio_for_key(t1, t2, key):
