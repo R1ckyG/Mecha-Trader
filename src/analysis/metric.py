@@ -45,6 +45,14 @@ class Metrics:
   @end_date.setter
   def end_date(self, value):
     self.end_date = value
+    
+  @property
+  def num_transactions(self):
+    return self.num_transactions
+
+  @num_transactions.setter
+  def num_transactions(self, value):
+    self.num_transactions = value
 
   def log_pos_returns(self, ticker, date, profit):
     self.tset.add(ticker)
@@ -222,6 +230,14 @@ class Metrics:
 
   def get_num_transactions(self, ticker):
     return 2 * (len(self.neg_returns[ticker]) + len(self.pos_returns[ticker]))
+  
+  def get_total_transactions(self):
+    total = 0
+    for ticker in self.neg_returns:
+      total = total + 2 * len(self.neg_returns[ticker])
+    for ticker in self.pos_returns:
+      total = total + 2 * len(self.pos_returns[ticker])
+    return total
   
   def get_total_days(self, ticker):
     return len(self.daily_roc[ticker])

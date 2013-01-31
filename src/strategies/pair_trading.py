@@ -5,14 +5,14 @@ from pyalgotrade.technical import ma, cross, trend
 from data import mongofeed
 from pyalgotrade.dataseries import BarValueDataSeries
 from utils import data_util as du
-import sys, numpy as np
+import sys, numpy as np, datetime, logging
 from analysis import metric
 
 metrics = metric.Metrics()
 
 class PairStrategy(strategy.Strategy):
     def __init__(self, feed, smaPeriod, f, tick1, tick2):
-        strategy.Strategy.__init__(self, f, 15000)
+        strategy.Strategy.__init__(self, f, 2000)
         self.__position = {} 
         self.__tick1 = tick1
         self.__tick2 = tick2
@@ -46,7 +46,7 @@ class PairStrategy(strategy.Strategy):
         self.cross_above = cross.CrossAbove(self.ratios, self.highs)
         self.cautious_cross_below = cross.CrossBelow(self.ratios, self.highs)
         self.cautious_cross_above = cross.CrossAbove(self.ratios, self.highs)
-        self.price_slope = trend.Slope(self.ratios, smaPeriod)
+        self.price_slope = trend.Slope(self.ratios, 60)
         self.last_slope = 0
       
             
@@ -57,24 +57,24 @@ class PairStrategy(strategy.Strategy):
     def onEnterOk(self, position):
         execInfo = position.getEntryOrder().getExecutionInfo()
         #position.setExitOnSessionClose(True)
-        print "%s: BUY %d of %s at $%.2f slope: %f" % (execInfo.getDateTime(), position.getQuantity(),
-                                             position.getInstrument(), execInfo.getPrice(), self.last_slope)
+        print "%s: BUY %d of %s at $%.2f" % (execInfo.getDateTime(), position.getQuantity(),
+                                             position.getInstrument(), execInfo.getPrice())
 
     def onEnterCanceled(self, position):
         self.__position = None
 
     def onExitOk(self, position):
         execInfo = position.getExitOrder().getExecutionInfo()
-        net_profit = position.getResult()
+        net_profit = position.getNetProfit()
         inst = position.getInstrument()
         date = execInfo.getDateTime()
         if net_profit > 0:
           metrics.log_pos_returns(inst, date, net_profit)
         else:
           metrics.log_neg_returns(inst, date, net_profit)
-        print "%s: SELL %d of %s at $%.2f profit: %f slope: %f" % (execInfo.getDateTime(), position.getQuantity(),
+        print "%s: SELL %d of %s at $%.2f profit: %f " % (execInfo.getDateTime(), position.getQuantity(),
                                              position.getInstrument(), execInfo.getPrice(), position.getQuantity() * position.getNetProfit()
-                                             ,self.last_slope)
+                                             )
         #self.__position = None
 
     def onExitCanceled(self, position):
@@ -89,7 +89,7 @@ class PairStrategy(strategy.Strategy):
         self.last_slope = self.price_slope.getValue()
         bar = bars.getBar(self.__tick1)
         bar2 = bars.getBar(self.__tick2)
-        
+        if not bar or not bar2: return
         if self.last_price[self.__tick1]:
           roc = (bar.getClose() - self.last_price[self.__tick1]) / self.last_price[self.__tick1]
           metrics.log_day_roc(self.__tick1, roc)  
@@ -130,6 +130,8 @@ def run_strategy(smaPeriod, tick, tick2='TRNS', plot=True):
 
     f = du.ArbiFeed()
     f.addBarsFromCSV(ratio, '%s/%s' %(tick, tick2))
+    now = datetime.datetime.now()
+    start = now - datetime.timedelta(days=365)
     data = du.get_data(tick)
     
     max_date = min_date = None
