@@ -131,8 +131,8 @@ def run_strategy(smaPeriod, tick, tick2='TRNS', plot=True):
     f = du.ArbiFeed()
     f.addBarsFromCSV(ratio, '%s/%s' %(tick, tick2))
     now = datetime.datetime.now()
-    start = now - datetime.timedelta(days=365)
-    data = du.get_data(tick)
+    start = now - datetime.timedelta(days=180)
+    data = du.get_data(tick, start_date=start)
     
     max_date = min_date = None
     if max_date == None:
@@ -146,7 +146,7 @@ def run_strategy(smaPeriod, tick, tick2='TRNS', plot=True):
       min_date = data[0]['date']   
     f.addBarsFromCSV(data, tick)
     
-    data = du.get_data(tick2)
+    data = du.get_data(tick2, start_date=start)
     if max_date == None:
       max_date = data[-1]['date']
     elif max_date < data[-1]['date']:

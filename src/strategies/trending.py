@@ -38,6 +38,11 @@ class TrendingStrategy(strategy.Strategy):
     if LOWERLIMIT >= len(tickers):
       LOWERLIMIT = int(len(tickers) * .5)
     max_date = min_date = None
+    import datetime
+    now = datetime.datetime.now()
+    start = now - datetime.timedelta(days=90)
+    
+
     for ticker in tickers:
       data = du.get_data(ticker)
       if len(data) <= 0:

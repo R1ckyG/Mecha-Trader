@@ -22,9 +22,9 @@ class StockDataStore(object):
       try:
         data_list.append(self.format(labels, company, datum))
       except:
-        print 'Uh oh: %s' % (company)
+        continue
     collection = self.db[company]
-    collection.insert(data_list)
+    if len(data_list): collection.insert(data_list)
  
   def format(self, labels, company, data):
     new_data = dict()
@@ -60,7 +60,7 @@ class StockDataStore(object):
       end_date = datetime.datetime.now()
       print 'Fetching for ' + company
       self.fetch_and_store( company, START_DATE, end_date.strftime('%Y%m%d'))
-      self.get_company_data(company, datetime.datetime.strptime(START_DATE, '%Y%m%d'), end_date, False)
+      data = self.get_company_data(company, datetime.datetime.strptime(START_DATE, '%Y%m%d'), end_date, False)
     return data
 
   def batch_fetch(self, ticker_file, start_date=START_DATE):

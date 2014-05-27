@@ -4,11 +4,12 @@ import gc, sys, operator, scipy, datetime, multiprocessing
 from rpy2 import robjects as ro 
 from rpy2.robjects import r
 from rpy2.robjects.packages import importr
-import lib.talib as tl
+import talib as tl
 import analysis.model_learning as ml
 import data.stock_data_store as sd
 import numpy as np
 import utils.data_util as du
+
 def get_time_left(start_time, num_complete, total):
   dtime =  datetime.datetime.now() - start_time
   time_per_ticker = num_complete / dtime.total_seconds()
@@ -21,7 +22,7 @@ def get_correlation(x, y, test=True):
   return corr
 
 def get_t_data(ticker):
-  d = s.get_company_data(ticker)
+  d = s.get_company_data(ticker, retry=False)
   nd = []
   for data in d:
     nd.append(data['Adj Clos'])
@@ -42,9 +43,18 @@ def get_correlations_for_tickers(tickers):
                      )
       print 'Finding Correlations for %s. Time remaining: %f minutes' % (ticker,time_left.seconds/60)
     first = False
-    t_data = get_t_data(ticker)
+    try:
+      t_data = get_t_data(ticker)
+    except Exception as e:
+      print e
+      continue
     for ticker_2 in tickers:
-      tdata_2 = get_t_data(ticker_2)
+      if ticker_2 == ticker: continue
+      try:
+        tdata_2 = get_t_data(ticker_2)
+      except Exception as e:
+        print e
+        continue
       if len(t_data) != len(tdata_2):
         t_data, tdata_2 = du.remap_data(t_data, tdata_2)  
       corr = get_correlation(t_data, tdata_2)[0]
