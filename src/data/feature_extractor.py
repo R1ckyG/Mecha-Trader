@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
-import lib.talib as tl
+import talib as tl
 import stock_data_store, sys
 
 RISK_FREE = 5.0
@@ -57,17 +57,17 @@ def get_feature_from_vector(vector, dtype=None):
   
   if dtype == 'adj_close':
     upper, middle, lower = tl.BBANDS(vector, timeperiod=20, nbdevup=2, 
-                                     nbdevdn=2, matype=tl.MA_SMA)
+                                     nbdevdn=2)
     feature_dict['bbands_20_upper'] = upper
     feature_dict['bbands_20_lower'] = lower
 
     upper, middle, lower = tl.BBANDS(vector, timeperiod=26, nbdevup=2, 
-                                     nbdevdn=2, matype=tl.MA_SMA)
+                                     nbdevdn=2)
     feature_dict['bbands_26_upper'] = upper
     feature_dict['bbands_26_lower'] = lower
 
     upper, middle, lower = tl.BBANDS(vector, timeperiod=32, nbdevup=2, 
-                                     nbdevdn=2, matype=tl.MA_SMA)
+                                     nbdevdn=2)
     feature_dict['bbands_32_upper'] = upper
     feature_dict['bbands_32_lower'] = lower
     feature_dict['momentum_12'] = tl.MOM(vector, timeperiod=12)
@@ -149,10 +149,9 @@ def get_feature_from_vector(vector, dtype=None):
 
 def get_stoch_features(close, high, low, days=12):
   slowk, slowd = tl.STOCH(high, low, close, fastk_period=days, 
-                          slowk_period=3, slowk_matype=tl.MA_SMA,
-                          slowd_period=3, slowd_matype=tl.MA_SMA)
+                          slowk_period=3, slowd_period=3)
   fastk, fastd = tl.STOCHF(high, low, close, fastk_period=days,
-                          fastd_period=3, fastd_matype=tl.MA_SMA)
+                          fastd_period=3)
   results = dict()
   results['slowk_%d' % days] = slowk
   results['slowd_%d' % days] = slowd
@@ -164,9 +163,7 @@ def apply_rsi_rule(features, days=8):
   rule_array = []
   key = 'rsi_%d' % days
   for i in range(len(features[key])):
-    if tl.nan == features[key][i]:
-      rule_array.append('hold')
-    elif features[key][i - 1] >= 30\
+    if features[key][i - 1] >= 30\
       and features[key][i] < 70:
       rule_array.append('buy')
     elif features[key][i -1] <= 30\
@@ -181,9 +178,7 @@ def apply_stoch_fast_rule(features, days=12):
   dkey = 'fastd_%d' % days
   kkey = 'fastk_%d' % days
   for i in range(len(features[dkey])):
-    if tl.nan == features[kkey][i]:
-      rule_array.append('hold')
-    elif features[kkey][i -1] <= features[dkey][i]\
+    if features[kkey][i -1] <= features[dkey][i]\
       and features[kkey][i] > features[dkey][i]:
       rule_array.append('buy')
     elif features[kkey][i -1] >= features[dkey][i]\
@@ -198,9 +193,7 @@ def apply_stoch_slow_rule(features, days=12):
   dkey = 'slowd_%d' % days
   kkey = 'slowk_%d' % days
   for i in range(len(features[dkey])):
-    if tl.nan == features[kkey][i]:
-      rule_array.append('hold')
-    elif features[kkey][i -1] <= features[dkey][i]\
+    if features[kkey][i -1] <= features[dkey][i]\
      and features[kkey][i] > features[dkey][i]:
       rule_array.append('buy')
     elif features[kkey][i -1] >= features[dkey][i]\
@@ -215,9 +208,7 @@ def apply_macd_rule(features, index=0, days=18):
   key = 'macd_%d_%d' % (index, days)
   macds_key = 'macds_%d_%d' % (index, days)
   for i in range(len(features[key])):
-    if tl.nan == features[key][i]:
-      rule_array.append('hold')
-    elif features[key][i - 1] <= features[macds_key][i]\
+    if features[key][i - 1] <= features[macds_key][i]\
       and features[key][i] > features[macds_key][i]:
       rule_array.append('buy')
     elif features[key][i - 1] >= features[macds_key][i]\
@@ -230,9 +221,7 @@ def apply_macd_rule(features, index=0, days=18):
 def apply_bollinger_rule(close_prices, features):
   rule_array = []
   for i in range(len(features['bbands_26_lower'])):
-    if tl.nan == features['bbands_26_lower'][i]:
-      rule_array.append('hold')
-    elif close_prices[i - 1] >= features['bbands_26_lower'][i] \
+    if close_prices[i - 1] >= features['bbands_26_lower'][i] \
       and close_prices[i] < features['bbands_26_upper'][i]:
       rule_array.append('buy')
     elif close_prices[i - 1] <= features['bbands_26_lower'][i] \
@@ -248,9 +237,7 @@ def apply_momentum_rule(features, days=24):
   ratio_key = 'ema_to_mom_%d' % days
   momentum_key = 'momentum_%d' % days
   for i in range(len(features[ratio_key])): 
-    if tl.nan == features[ratio_key][i]:
-      rule_array.append('hold') 
-    elif features[momentum_key][i - 1] <= features[ratio_key][i]\
+    if features[momentum_key][i - 1] <= features[ratio_key][i]\
       and features[momentum_key][i] > features[ratio_key][i]:
       rule_array.append('buy')
     elif features[momentum_key][i - 1] >= features[ratio_key][i]\
@@ -264,9 +251,7 @@ def apply_roc_rule(features, days=12):
   key = 'rate_of_change_%d' % days
   rule_array = []
   for i in range(len(features[key])):
-    if tl.nan == features[key][i]:
-      rule_array.append('hold')
-    elif features[key][i] > 0 and features[key][i-1] <= 0:
+    if features[key][i] > 0 and features[key][i-1] <= 0:
       rule_array.append('buy')
     elif features[key][i] < 0 and features[key][i-1] >= 0:
       rule_array.append('sell')
