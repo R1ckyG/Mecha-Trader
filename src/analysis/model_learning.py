@@ -9,7 +9,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import DPGMM
 from sklearn.metrics import classification_report, confusion_matrix
 from lib import talib
-import sys, math
+import sys, math, cPickle
 
 def data_valid(datum):
   for key in datum:
@@ -166,6 +166,9 @@ if __name__ == '__main__':
         if not mtype == 'gmm':print '*' * 50, 'Score for %r: %f' % (ticker, score)
         print classification_report( test, predictions)
         print confusion_matrix(test, predictions)
+        
+        with open('%s_%s.pkl' % (mtype, ticker), 'wb') as fid:
+            cPickle.dump(c, fid)
       except Exception, e:
         print e 
         pass

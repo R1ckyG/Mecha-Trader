@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 from __future__ import division
 import gc, sys, operator, scipy, datetime, multiprocessing
+from scipy.special import comb
 from rpy2 import robjects as ro 
 from rpy2.robjects import r
 from rpy2.robjects.packages import importr
 import talib as tl
-import analysis.model_learning as ml
+#import analysis.model_learning as ml
 import data.stock_data_store as sd
 import numpy as np
 import utils.data_util as du
@@ -30,7 +31,7 @@ def get_t_data(ticker):
   nd = tl.ROC(nd, timeperiod=7)
   return ro.FloatVector(nd[7:].tolist())
     
-def get_correlations_for_tickers(tickers):
+def get_correlations_for_tickers(tickers, show_exception=False):
   corrs = []
   start_time = datetime.datetime.now()
   first = True
@@ -39,21 +40,21 @@ def get_correlations_for_tickers(tickers):
       time_left =  get_time_left(
                        start_time, 
                        len(corrs), 
-                       scipy.misc.comb(len(tickers), 2)
+                       scipy.special.comb(len(tickers), 2)
                      )
       print 'Finding Correlations for %s. Time remaining: %f minutes' % (ticker,time_left.seconds/60)
     first = False
     try:
       t_data = get_t_data(ticker)
     except Exception as e:
-      print e
+      if show_exception: print "throwing exception", e
       continue
     for ticker_2 in tickers:
       if ticker_2 == ticker: continue
       try:
         tdata_2 = get_t_data(ticker_2)
       except Exception as e:
-        print e
+        if show_exception: print "throwing exception", e, ticker_2
         continue
       if len(t_data) != len(tdata_2):
         t_data, tdata_2 = du.remap_data(t_data, tdata_2)  
@@ -78,7 +79,6 @@ def garbage_collect(garbage):
   for trash in garbage:
     r('rm(%s)' % trash)
   r('gc(FALSE)')
-
 
 def get_adf(t1, t2, spread=False, portion=0):
   d1 = s.get_company_data(t1)
@@ -168,7 +168,7 @@ if __name__ == '__main__':
     tickers = [ticker.strip() for ticker in f]
     f.close()
     print 'Tickers: %d Num. of combinations: %d'\
-       % (len(tickers), scipy.misc.comb(len(tickers), 2))
+       % (len(tickers), scipy.special.comb(len(tickers), 2))
     corrs = get_correlations_for_tickers(tickers)
     corrs = sorted(corrs, key=operator.itemgetter(1))
     output = open('correlations.txt', 'w', buffering=0)
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     c = multiprocessing.cpu_count()
     print 'Using %d processes' % c
     pool = multiprocessing.Pool(processes=c - 1)
-    result = pool.imap_unordered(get_formatted_adf, c_tickers, chunksize=500)
+    result = pool.imap_unordered(get_formatted_adf, c_tickers[:500], chunksize=500)
     result = filter(lambda x: True if x[1] else False, result)
     result = sorted(result, key=operator.itemgetter(1))
     output = open('adf.txt', 'w', buffering=0)
