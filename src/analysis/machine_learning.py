@@ -7,15 +7,86 @@ from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier,
 from sklearn.svm import SVC, NuSVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import DPGMM
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, average_precision_score
+import sklearn.preprocessing as pw
 from lib import talib
-import sys, math, cPickle
+import sys, math, cPickle, copy
 
 def data_valid(datum):
   for key in datum:
     if isinstance(datum[key], float) and math.isnan(datum[key]):
       return False
   return True
+
+def prep_training_data(data, label='label', fields_to_remove=[]):
+  clean_data = list()
+  labels = list()
+  
+  for da in data:
+    d = copy.copy(da)
+    for field in fields_to_remove:
+      if field in d: d.pop(field)
+        
+    if data_valid(d):
+      labels.append(d.pop(label))
+      clean_data.append(d)
+  return clean_data, labels
+
+def get_model(model_type, features, labels, grid_search=True, train_test_cutoff=.75):
+  model, mtype = select_model(model_type)
+  if grid_search:
+    c = get_best_model_params(model, features, labels, model_type=mtype, train_test_cutoff=train_test_cutoff)
+    return c
+  return model
+  
+def run_model(model, features, labels, train_test_cutoff=.75):
+  if isinstance(model, GradientBoostingClassifier):
+    predictions = model.score(features)
+    score = predictions
+  else:
+    score = model.score(features, labels)
+    predictions = model.predict(features)
+  return predictions, score
+
+def evaluate_model(exp_name, model, labels, predictions, scores):
+  outfile = open('%s_exp_output.txt' % exp_name, 'w', buffering=0)
+  
+  msg = '-' * 35 + exp_name +'-' * 35 + '\n'
+  msg = msg + 'Score: %r' % scores + '\n\n'
+  
+  cr = classification_report(labels.tolist(), predictions) 
+  cm = confusion_matrix(labels, predictions)
+  msg = msg + '%r' % cr + '\n\n\n'
+  msg = msg + '%r' % cm
+  
+  outfile.write(msg)
+  with open('%s.pkl' % (exp_name), 'wb') as fid:
+            cPickle.dump(model, fid)
+  
+  results = {}
+  results['predictions'] = predictions
+  results['scores'] = scores
+  results['cm'] = cm
+  results['cr'] = cr
+  
+  return results
+
+def run_experiment(exp_name, model_type, data, label='label', fields_to_remove=[],\
+    feature_extracor=prep_training_data, model_selector=get_model,\
+    model_runner=run_model, evaluator=evaluate_model, grid_search=True, train_test_cutoff=.75):
+  
+  print "Preparing training data and model for expermient %s" % exp_name
+  features, labels = prep_training_data(data, label, fields_to_remove)
+  model = model_selector(model_type, features, labels, grid_search, train_test_cutoff=.75)
+  
+  print "Evaluating model for experiment %s" % exp_name
+  test_features, test_labels = get_data(features, labels, train_test_cutoff)
+  predictions, scores = model_runner(model, test_features, test_labels, train_test_cutoff)
+  results = evaluator(exp_name, model, test_labels, predictions, scores)
+  
+  return model, results
+
+#--------------------------- Legacy code ----------------------#
 
 def get_clean_data(ticker):
   clean_data = list()
@@ -39,20 +110,26 @@ def get_data_for_multiple(tickers):
     clean_labels.extend(labels)
   return clean_data, clean_lables
 
-def get_data_sets(data, labels):
+def get_data_sets(data, labels, train_test_cutoff=.75):
   data_length = len(data)
-  partition_index = int(data_length *.75)
+  partition_index = int(data_length * train_test_cutoff)
+  l = list()
+  for d in data:
+    f = list()
+    for k in d:
+      f.append(d[k])
+    l.append(f)
+    
+  cat_features = [i for i in range(len(l[0])) if type(l[0][i]) == str]
+  print cat_features
+  train = pw.OneHotEncoder(categorical_features=cat_features).fit_transform(l)
   print 'Length of training set: %d\nLength of test set: %d' \
       % (partition_index, data_length - partition_index)
-  return data[:partition_index], data[partition_index:], labels[:partition_index], labels[partition_index:]
-
-
-def get_data(data, labels):
-  x_train, x_test, y_train, y_test = get_data_sets(data, labels)
-  train = dv().fit_transform(x_test)
-  test = np.array(y_test)
+  return np.array(train[:partition_index]), np.array(train[partition_index:]), np.array(labels[:partition_index]), np.array(labels[partition_index:])
   
-  return train.todense(), test
+def get_data(data, labels, train_test_cutoff=.75):
+  x_train, features, y_train, test = get_data_sets(data, labels, train_test_cutoff)
+  return features, test
 
 def select_model(model_key):
   model = None
@@ -97,25 +174,21 @@ def get_hyper_parameters(model_key):
     hyper_parameters = [{'covariance_type':['spherical', 'diag']}]
   return hyper_parameters
 
-def get_best_model_params(model, data, labels, model_type='b'):
-  x_train, x_test, y_train, y_test = get_data_sets(data, labels)
-  train = dv().fit_transform(x_train)
-  test = np.array(y_train)
+def get_best_model_params(model, data, labels, model_type='b', train_test_cutoff=.75):
+  train, x_test, test, y_test = get_data_sets(data, labels, train_test_cutoff)
+  train = pw.scale(train)
+  
   hyper_parameters = get_hyper_parameters(model_type)
   clf = gs(model, hyper_parameters)
   if model_type == 'gmm':
     clf = model
-    clf.fit(train.todense())
+    clf.fit(train)
   else:  
-    clf.fit(train.todense(), test)
+    clf.fit(train, test)
   
   print "Best parameters set found on development set:"
   print
   if not model_type == 'gmm': print clf.best_estimator_
-  
-  train = dv().fit_transform(x_test)
-  test = np.array(y_test)
-  #print clf.score(train.todense(), test)
   return clf
 
 if __name__ == '__main__':

@@ -10,6 +10,49 @@ def get_data(ticker, start_date=None, end_date=None):
   cursor = s.get_company_data(ticker, start_date, end_date)
   return [data for data in cursor]
 
+def get_data_at_delta(delta, data, delta_label='date'):
+  for i, dic in enumerate(data):
+    if dic[delta_label] == delta:
+      return dic
+  return None
+  
+def get_snp_data_as_list(start, end):
+  data_store = sds.StockDataStore()
+  snp_data = data_store.get_company_data(
+                            '^GSPC'
+                            ,start_date=start
+                            ,end_date=end
+                          )
+  datam = []
+  for d in snp_data:
+    datam.append(d)
+  return datam
+
+def align_data(d1, d2, delta_label='date'):
+  small_d = []
+  big_d = []
+  is_d1_smalld = False
+  
+  if len(d1) == len(d2):
+    return d1, d2
+  elif len(d1) > len(d2):
+    small_d = d2
+    big_d = d1
+  else:
+    small_d = d1
+    big_d = d2
+    is_d1_smalld = True
+    
+  new_d =  []
+  for data in small_d:
+    dt = data[delta_label]
+    new_d.append(get_data_at_delta(dt, big_d, delta_label))
+  
+  if is_d1_smalld:
+    return d1, new_d 
+  else:
+    return new_d, d2
+
 def get_ratio_for_key(t1, t2, key):
   t1_data = get_data(t1)
   t2_data = get_data(t2)

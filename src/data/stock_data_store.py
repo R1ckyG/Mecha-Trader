@@ -7,7 +7,7 @@ STOCK_DB = 'stock_data'
 
 class StockDataStore(object):
   def __init__(self, database=STOCK_DB):
-    self.conn = pymongo.Connection()
+    self.conn = pymongo.MongoClient()
     self.db = self.conn[database]
   
   def add_data(company, stock_data):

@@ -2,9 +2,13 @@
 import numpy as np
 import talib as tl
 import stock_data_store, sys
+import utils.data_util as du
 
 RISK_FREE = 5.0
 
+def get_adjusted_ratio(bar):
+    return bar["Adj Clos"] / bar["Close"] 
+ 
 def make_data_vectors(data):
   """Utility function taking a list of dicts and returning arrays"""
   result_dict = {'adjusted_close': list(), 
@@ -16,15 +20,17 @@ def make_data_vectors(data):
                  'date': list()
                 }
   for datum in data:
+    ratio = get_adjusted_ratio(datum)
+    
     result_dict['adjusted_close'].append(datum['Adj Clos']) if \
         'Adj Clos' in datum else result_dict['adjusted_close'].append(None)
-    result_dict['raw_close'].append(datum['Close']) if \
+    result_dict['raw_close'].append(datum['Close'] * ratio) if \
         'Close' in datum else result_dict['raw_close'].append(None)
-    result_dict['high'].append(datum['High']) if \
+    result_dict['high'].append(datum['High'] * ratio) if \
         'High' in datum else result_dict['high'].append(None)
-    result_dict['low'].append(datum['Low']) if 'Low' in datum \
+    result_dict['low'].append(datum['Low'] * ratio) if 'Low' in datum \
         else result_dict['low'].append(None)
-    result_dict['open'].append(datum['Open']) if 'Open' in datum \
+    result_dict['open'].append(datum['Open'] * ratio) if 'Open' in datum \
         else result_dict['open'].append(None)
     result_dict['volume'].append(datum['Volume']) if 'Volume' in datum \
         else result_dict['volume'].append(None)
@@ -407,7 +413,7 @@ def get_features_from_vectors(data_vectors):
   return feature_dict
 
 snp_vector = None
-def find_bxret(data, snp_vector, vector, index):
+def find_bxret(data, snp_vector, vector, complete_datum, index, window=0):
   roc_vector = tl.ROC(vector, timeperiod=14)
   snp_roc = tl.ROC(snp_vector, timeperiod=14)
   beta = tl.BETA(roc_vector, snp_roc, timeperiod=14)
@@ -415,48 +421,72 @@ def find_bxret(data, snp_vector, vector, index):
   excess = beta[index] * (snp_roc[index] - RISK_FREE) + RISK_FREE
   #print 'stock roc: %f, SnP roc: %f, beta: %f, exp-ret.: %f' %\
   #(roc_vector[index], snp_roc[index], beta[index], RISK_FREE + beta[index] * (snp_roc[index] - RISK_FREE))
-  if expected_return > 0:
-    return 1, excess
-  else:
-    return -1, excess
   
-def combine(data, vectors, features):
+  if expected_return > 0:
+    bx = 1
+  else:
+    bx = -1
+  
+  complete_datum['bxret'] = bx
+  complete_datum['excess'] = excess
+  return complete_datum
+  
+def combine(data, vectors, features, snp_data, label_func=find_bxret, window=0):
   print len(data), len(vectors['close'])
   results = []
-  sds = stock_data_store.StockDataStore()
-  print 'timespan:', data[0]['date'], data[-1]['date']
-  snp_data = sds.get_company_data(
-                            '^GSPC'
-                            ,start_date=data[0]['date']
-                            ,end_date=data[-1]['date']
-                          )
-  datam = []
-  for d in snp_data:
-    datam.append(d)
-  vectored = make_data_vectors(datam)
+  vectored = make_data_vectors(snp_data)
   snp_vector = vectored['adj_close']
+
   print len(data) == len(snp_vector), len(data), len(snp_vector)
   for i in range(len(data)):
     complete_datum = complete_datapoint(data[i], features, i)
-    bx, excess = find_bxret(data, snp_vector, vectors['adj_close'], i)
-    complete_datum['bxret'] = bx
-    complete_datum['excess'] = excess
-    results.append(complete_datum)
+    complete_datum = label_func(data, snp_vector, vectors['adj_close'], complete_datum, i, window)
+    
+    if not complete_datum == None: 
+      results.append(complete_datum)
   return results
 
-def extract_data(data_cursor):
+global_snp_data = None
+def extract_data_from_data_cursor(data_cursor, label_func=find_bxret, window=0):
+  global global_snp_data
   data = []
   for datum in data_cursor:
     data.append(datum)
+  
+  if global_snp_data == None:
+    global_snp_data = du.get_snp_data_as_list(data[0], data[-1])
+  data, snp_data = du.align_data(data, global_snp_data)
+  
+  print '-' * 60
+  print 'StartDate: %s, EndDate: %s' %(data[0]['date'], data[-1]['date'])
+  
   vectors = make_data_vectors(data)
   features = get_features_from_vectors(vectors)
-  processed_data = combine(data, vectors, features)
+  processed_data = combine(data, vectors, features, snp_data, label_func, window=0)
+  
+  print '-' * 60
+  print
   return processed_data
+  
+def extract_data_from_multiple_tickers(tickers, start, end, label_func=find_bxret, window=0):
+  dc = []
+  data_store = stock_data_store.StockDataStore()
+  for ticker in tickers:
+    try:
+        print "Extracting for %s" % ticker
+        dc.extend(extract_data_from_data_cursor(data_store.get_company_data(ticker, start, end), label_func, window))
+    except Exception as e:
+        print "Could not extract features for %s\n %r" % (ticker, e)
+        print '-' * 60
+        import traceback as tb
+        tb.print_exc()
+        continue
+  return dc
 
-def get_features(ticker):
+def get_features(ticker, window=0):
   data_store = stock_data_store.StockDataStore()
   data = data_store.get_company_data(ticker)
-  processed_data = extract_data(data)
+  processed_data = extract_data_from_data_cursor(data, window=window)
   return processed_data
 
 if __name__=='__main__':
@@ -471,5 +501,5 @@ if __name__=='__main__':
     for ticker in tickers:
       print 'Making data for %s' % ticker
       data = data_store.get_company_data(ticker)
-      processed_data = extract_data(data)
+      processed_data = extract_data_from_data_cursor(data)
       data_store.save_data(ticker, processed_data)      
