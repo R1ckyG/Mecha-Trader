@@ -10,13 +10,7 @@ from sklearn.mixture import DPGMM
 from sklearn.metrics import classification_report, confusion_matrix, average_precision_score
 import sklearn.preprocessing as pw
 from lib import talib
-import sys, math, cPickle, copy
-
-def data_valid(datum):
-  for key in datum:
-    if isinstance(datum[key], float) and math.isnan(datum[key]):
-      return False
-  return True
+import sys, math, cPickle, copy, pdb
 
 def prep_training_data(data, label='label', fields_to_remove=[]):
   clean_data = list()
@@ -43,12 +37,14 @@ def run_model(model, features, labels, train_test_cutoff=.75):
   if isinstance(model, GradientBoostingClassifier):
     predictions = model.score(features)
     score = predictions
+    probablities = model.predict_proba(features)
   else:
     score = model.score(features, labels)
     predictions = model.predict(features)
-  return predictions, score
+    probablities = model.predict_proba(features)
+  return predictions, score, probablities
 
-def evaluate_model(exp_name, model, labels, predictions, scores):
+def evaluate_model(exp_name, model, labels, predictions, scores, probabilities):
   outfile = open('%s_exp_output.txt' % exp_name, 'w', buffering=0)
   
   msg = '-' * 35 + exp_name +'-' * 35 + '\n'
@@ -56,18 +52,21 @@ def evaluate_model(exp_name, model, labels, predictions, scores):
   
   cr = classification_report(labels.tolist(), predictions) 
   cm = confusion_matrix(labels, predictions)
-  msg = msg + '%r' % cr + '\n\n\n'
-  msg = msg + '%r' % cm
+  msg = msg + '%s' % cr + '\n\n\n'
+  msg = msg + '%s' % cm
   
+  print msg
   outfile.write(msg)
   with open('%s.pkl' % (exp_name), 'wb') as fid:
             cPickle.dump(model, fid)
   
   results = {}
-  results['predictions'] = predictions
-  results['scores'] = scores
   results['cm'] = cm
   results['cr'] = cr
+  results['predictions'] = predictions
+  results['labels'] = labels
+  results['scores'] = scores
+  results['probabilities'] = probabilities
   
   return results
 
@@ -81,12 +80,18 @@ def run_experiment(exp_name, model_type, data, label='label', fields_to_remove=[
   
   print "Evaluating model for experiment %s" % exp_name
   test_features, test_labels = get_data(features, labels, train_test_cutoff)
-  predictions, scores = model_runner(model, test_features, test_labels, train_test_cutoff)
-  results = evaluator(exp_name, model, test_labels, predictions, scores)
+  predictions, scores, probabilities = model_runner(model, test_features, test_labels, train_test_cutoff)
+  results = evaluator(exp_name, model, test_labels, predictions, scores, probabilities)
   
   return model, results
 
-#--------------------------- Legacy code ----------------------#
+#--------------------------- Data Prep ----------------------#
+
+def data_valid(datum):
+  for key in datum:
+    if isinstance(datum[key], float) and math.isnan(datum[key]):
+      return False
+  return True
 
 def get_clean_data(ticker):
   clean_data = list()
@@ -110,6 +115,26 @@ def get_data_for_multiple(tickers):
     clean_labels.extend(labels)
   return clean_data, clean_lables
 
+def encode_str_features(data):
+  str_features = dict()
+  print len(data)
+  for d in data:
+    for i in range(len(d)):
+     if type(d[i]) == str:
+       if i in str_features and not d[i] in str_features[i]:
+         str_features[i].append(d[i])
+       elif not i in str_features:
+         str_features[i] = list()
+         str_features[i].append(d[i])
+   
+  results = list()
+  for d in data:
+    for i in range(len(d)):
+      if i in str_features:
+        d[i] = str_features[i].index(d[i])
+    results.append(d)
+  return results
+
 def get_data_sets(data, labels, train_test_cutoff=.75):
   data_length = len(data)
   partition_index = int(data_length * train_test_cutoff)
@@ -122,7 +147,9 @@ def get_data_sets(data, labels, train_test_cutoff=.75):
     
   cat_features = [i for i in range(len(l[0])) if type(l[0][i]) == str]
   print cat_features
-  train = pw.OneHotEncoder(categorical_features=cat_features).fit_transform(l)
+  train = encode_str_features(l)
+  train = pw.OneHotEncoder(categorical_features=cat_features).fit_transform(l).toarray()
+  train = pw.normalize(train, 'l1', 0)
   print 'Length of training set: %d\nLength of test set: %d' \
       % (partition_index, data_length - partition_index)
   return np.array(train[:partition_index]), np.array(train[partition_index:]), np.array(labels[:partition_index]), np.array(labels[partition_index:])
@@ -130,6 +157,8 @@ def get_data_sets(data, labels, train_test_cutoff=.75):
 def get_data(data, labels, train_test_cutoff=.75):
   x_train, features, y_train, test = get_data_sets(data, labels, train_test_cutoff)
   return features, test
+
+#--------------------------- Model Prep ----------------------#
 
 def select_model(model_key):
   model = None
@@ -153,22 +182,22 @@ def select_model(model_key):
 def get_hyper_parameters(model_key):
   hyper_parameters = None
   if model_key == 'b':
-    hyper_parameters = [{'learn_rate':[.1], 'n_estimators': [800,1000, 1500],
-                         'max_depth': [6], 'subsample':[.25], 'max_features': [ 14]}]
+    hyper_parameters = [{'learn_rate':[.1], 'loss':['deviance', 'exponential'], 'n_estimators': [10,20, 50, 100],
+                         'max_depth': [25], 'subsample':[.25], 'max_features': [ 50, 100]}]
   elif model_key == 'svc':
-    hyper_parameters = [{'C':[1,1e3, 5e3, 1e4, 5e4, 1e5], 'kernel':['rbf',  'sigmoid'], 'degree':[3, 6, 9]
-                         ,'gamma':[ .01, .1], 'coef0':[.01 ,.02]}]
+    hyper_parameters = [{'C':[1,1e3, 5e3, 1e4, 5e4, 1e5], 'kernel':['rbf',  'sigmoid', 'poly'], 'degree':[3, 6, 9]
+                         ,'gamma':[ .01, .1], 'coef0':[0.0, .01 ,.02],'probability':[True]}]
   elif model_key == 'nusvc':
     hyper_parameters = [{'C':[1e3, 5e3, 1e4, 5e4, 1e5],'nu':[.1], 'kernel':['rbf']
                          ,'gamma':[ .01], 'coef0':[.01]}] 
   elif model_key == 'r':
-    hyper_parameters = [{'n_estimators':[10, 100, 200], 'criterion':['gini', 'entropy']
-                        ,'n_jobs':[2], 'max_features':['sqrt', 'log2']}]
+    hyper_parameters = [{'n_estimators':[10, 50], 'criterion':['gini', 'entropy']
+                        ,'max_leaf_nodes':[40, 100, 200], 'max_features':[20, 50, 100, 'sqrt', 'log2']}]
   elif model_key == 'e':
     hyper_parameters = [{'n_estimators':[10, 100, 200], 'criterion':['gini', 'entropy']
-                        ,'n_jobs':[2], 'max_features':['sqrt', 'log2']}]
+                        , 'max_features':['sqrt', 'log2']}]
   elif model_key == 'nn':
-    hyper_parameters = [{'n_neighbors': [5, 15, 35, 61], 'algorithm': ['ball_tree', 'kd_tree'],
+    hyper_parameters = [{'n_neighbors': [5, 15, 35, 61], 'algorithm': ['ball_tree', 'kd_tree', 'brute'],
                          'p':[1, 2, 3], 'weights':['distance', 'uniform'] }]
   elif model_key == 'gmm':
     hyper_parameters = [{'covariance_type':['spherical', 'diag']}]
@@ -176,8 +205,6 @@ def get_hyper_parameters(model_key):
 
 def get_best_model_params(model, data, labels, model_type='b', train_test_cutoff=.75):
   train, x_test, test, y_test = get_data_sets(data, labels, train_test_cutoff)
-  train = pw.scale(train)
-  
   hyper_parameters = get_hyper_parameters(model_type)
   clf = gs(model, hyper_parameters)
   if model_type == 'gmm':

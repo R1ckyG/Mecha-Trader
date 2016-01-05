@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import numpy as np
 import talib as tl
+import traceback as tb, datetime
 import stock_data_store, sys
 import utils.data_util as du
+from operator import itemgetter
 
 RISK_FREE = 5.0
 
@@ -454,7 +456,7 @@ def extract_data_from_data_cursor(data_cursor, label_func=find_bxret, window=0):
     data.append(datum)
   
   if global_snp_data == None:
-    global_snp_data = du.get_snp_data_as_list(data[0], data[-1])
+    global_snp_data = du.get_snp_data_as_list(data[0]['date'], data[-1]['date'])
   data, snp_data = du.align_data(data, global_snp_data)
   
   print '-' * 60
@@ -462,26 +464,30 @@ def extract_data_from_data_cursor(data_cursor, label_func=find_bxret, window=0):
   
   vectors = make_data_vectors(data)
   features = get_features_from_vectors(vectors)
-  processed_data = combine(data, vectors, features, snp_data, label_func, window=0)
+  processed_data = combine(data, vectors, features, snp_data, label_func, window=window)
   
   print '-' * 60
   print
-  return processed_data
+  
+  results = sorted(processed_data, key=itemgetter('date')) 
+  return results
   
 def extract_data_from_multiple_tickers(tickers, start, end, label_func=find_bxret, window=0):
   dc = []
   data_store = stock_data_store.StockDataStore()
-  for ticker in tickers:
+  start_time = datetime.datetime.now()
+  for i, ticker in enumerate(tickers):
+    time_left = du.get_time_left(start_time, i, len(tickers)).total_seconds() if i > 0 else 0
     try:
-        print "Extracting for %s" % ticker
+        print "Extracting for %s (%d/%d), %.2f minutes left" % (ticker, i, len(tickers), time_left / 60)
         dc.extend(extract_data_from_data_cursor(data_store.get_company_data(ticker, start, end), label_func, window))
     except Exception as e:
         print "Could not extract features for %s\n %r" % (ticker, e)
         print '-' * 60
-        import traceback as tb
         tb.print_exc()
         continue
-  return dc
+  results = sorted(dc, key=itemgetter('date')) 
+  return results
 
 def get_features(ticker, window=0):
   data_store = stock_data_store.StockDataStore()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, datetime, pymongo
+import sys, datetime, pymongo, pdb, traceback
 import YahooFinanceRetriever
 
 START_DATE = '20091002'
@@ -57,10 +57,11 @@ class StockDataStore(object):
        data = collection.find({'$and':[{'date':{'$gte':start_date}},
                                {'date':{'$lte':end_date}}]}).sort('date')
     if data.count() == 0 and retry:
+      sd = START_DATE if start is None else start.strftime('%Y%m%d')
       end_date = datetime.datetime.now()
       print 'Fetching for ' + company
-      self.fetch_and_store( company, START_DATE, end_date.strftime('%Y%m%d'))
-      data = self.get_company_data(company, datetime.datetime.strptime(START_DATE, '%Y%m%d'), end_date, False)
+      self.fetch_and_store( company, sd, end_date.strftime('%Y%m%d'))
+      data = self.get_company_data(company, datetime.datetime.strptime(sd, '%Y%m%d'), end_date, False)
     return data
 
   def batch_fetch(self, ticker_file, start_date=START_DATE):

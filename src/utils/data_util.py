@@ -28,6 +28,12 @@ def get_snp_data_as_list(start, end):
     datam.append(d)
   return datam
 
+def get_time_left(start_time, num_complete, total):
+  dtime =  datetime.datetime.now() - start_time
+  time_per_ticker = dtime.total_seconds() /num_complete
+  diff = total - num_complete
+  return datetime.timedelta(seconds=int(time_per_ticker * diff))
+
 def align_data(d1, d2, delta_label='date'):
   small_d = []
   big_d = []

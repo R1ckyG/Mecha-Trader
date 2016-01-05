@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from __future__ import division
-import gc, sys, operator, scipy, datetime, multiprocessing
+import gc, sys, operator, scipy, datetime, multiprocessing, traceback
 from scipy.special import comb
 import talib as tl
 import rpy2.rinterface as rinterface
@@ -102,7 +102,7 @@ def get_correlation_wrap(pair):
         gc.collect()
         print "%.2f minutes left" % (get_time_left(start_time, counter.value, total.value).total_seconds() / 60), "%d / %d" % (counter.value, total.value)
   except Exception as e:
-    print e
+    print e, traceback.print_exc()
     return ("Fucked Up", None)
   return result
 

@@ -5,15 +5,15 @@ import talib as tl
 
 RISK_FREE = 5.0
 
-def label_func(data, snp_vector, vector, complete_datum, index, window=1):
+def label_func(data, snp_vector, vector, complete_datum, index, window=14):
   if len(snp_vector) <= index + window: 
     return None
   
   windowed_index = index + window
   
-  roc_vector = tl.ROC(vector, timeperiod=14)
-  snp_roc = tl.ROC(snp_vector, timeperiod=14)
-  beta = tl.BETA(roc_vector, snp_roc, timeperiod=14)
+  roc_vector = tl.ROC(vector, timeperiod=window)
+  snp_roc = tl.ROC(snp_vector, timeperiod=window)
+  beta = tl.BETA(roc_vector, snp_roc, timeperiod=window)
   
   expected_return = beta[windowed_index] * (snp_roc[windowed_index] - RISK_FREE)
   excess = beta[windowed_index] * (snp_roc[windowed_index] - RISK_FREE) + RISK_FREE
@@ -26,16 +26,18 @@ def label_func(data, snp_vector, vector, complete_datum, index, window=1):
   else:
     bx = -1
   
-  complete_datum['expected_return'] = bx
+  complete_datum['bx'] = bx
   complete_datum['excess'] = excess
   complete_datum['label'] = label 
   
   return complete_datum
  
-def get_test_data():
-    start = dt(2014,1,1,0,0,0,0)
+def get_test_data(window=1, tickers=['AAPL', 'GOOG', 'FB', 'GE', 'AMZN', 'NFLX']):
+    start = dt(2011,1,1,0,0,0,0)
     end = dt(2016,1,1,0,0,0,0)
-    feature_data = fe.extract_data_from_multiple_tickers(['AAPL', 'GOOG', 'FB', 'GE', 'AMZN', 'NFLX'], start, end, label_func, 1)
+    #x = ['AAPL', 'GOOG', 'FB', 'GE', 'AMZN', 'NFLX']
+    x = ['GE']
+    feature_data = fe.extract_data_from_multiple_tickers(tickers, start, end, label_func, window)
     
     count = 0
     for i in feature_data:
