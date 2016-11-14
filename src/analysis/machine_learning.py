@@ -9,6 +9,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import DPGMM
 from sklearn.metrics import classification_report, confusion_matrix, average_precision_score
 import sklearn.preprocessing as pw
+import sklearn.feature_selection as fs
 from lib import talib
 import sys, math, cPickle, copy, pdb
 
@@ -149,7 +150,8 @@ def get_data_sets(data, labels, train_test_cutoff=.75):
   print cat_features
   train = encode_str_features(l)
   train = pw.OneHotEncoder(categorical_features=cat_features).fit_transform(l).toarray()
-  train = pw.normalize(train, 'l1', 0)
+  train = pw.normalize(train, 'l2', 0)
+  train = fs.SelectPercentile(fs.f_classif, percentile=5).fit_transform(train, labels)
   print 'Length of training set: %d\nLength of test set: %d' \
       % (partition_index, data_length - partition_index)
   return np.array(train[:partition_index]), np.array(train[partition_index:]), np.array(labels[:partition_index]), np.array(labels[partition_index:])
@@ -165,12 +167,12 @@ def select_model(model_key):
   if model_key == 'b':
     model = GradientBoostingClassifier()
   elif model_key == 'svc':
-    model = SVC()
+    model = SVC(probability=True, gamma='auto')
   elif model_key == 'nusvc':
     print 'selecting NuSVC'
-    model = NuSVC()
+    model = NuSVC(probability=True)
   elif model_key == 'r':
-    model = RandomForestClassifier()
+    model = RandomForestClassifier(class_weight={'buy':1, 'stay':.75})
   elif model_key == 'e':
     model = ExtraTreesClassifier()
   elif model_key == 'nn':
@@ -183,19 +185,18 @@ def get_hyper_parameters(model_key):
   hyper_parameters = None
   if model_key == 'b':
     hyper_parameters = [{'learn_rate':[.1], 'loss':['deviance', 'exponential'], 'n_estimators': [10,20, 50, 100],
-                         'max_depth': [25], 'subsample':[.25], 'max_features': [ 50, 100]}]
+                         'max_depth': [25], 'subsample':[.25]}]
   elif model_key == 'svc':
     hyper_parameters = [{'C':[1,1e3, 5e3, 1e4, 5e4, 1e5], 'kernel':['rbf',  'sigmoid', 'poly'], 'degree':[3, 6, 9]
-                         ,'gamma':[ .01, .1], 'coef0':[0.0, .01 ,.02],'probability':[True]}]
+                         ,'gamma':[ .01, .1], 'coef0':[0.0, .01 ,.02]}]
   elif model_key == 'nusvc':
-    hyper_parameters = [{'C':[1e3, 5e3, 1e4, 5e4, 1e5],'nu':[.1], 'kernel':['rbf']
-                         ,'gamma':[ .01], 'coef0':[.01]}] 
+    hyper_parameters = [{'nu':[.1, .4, .6, .7,], 'kernel':['rbf', 'sigmoid', 'poly'], 'degree':[9]
+                         , 'coef0':[0.0, .01, .5, 1, 5]}] 
   elif model_key == 'r':
     hyper_parameters = [{'n_estimators':[10, 50], 'criterion':['gini', 'entropy']
-                        ,'max_leaf_nodes':[40, 100, 200], 'max_features':[20, 50, 100, 'sqrt', 'log2']}]
+                        ,'max_leaf_nodes':[40, 100, 200]}]
   elif model_key == 'e':
-    hyper_parameters = [{'n_estimators':[10, 100, 200], 'criterion':['gini', 'entropy']
-                        , 'max_features':['sqrt', 'log2']}]
+    hyper_parameters = [{'n_estimators':[10, 100, 200], 'criterion':['gini', 'entropy']}]
   elif model_key == 'nn':
     hyper_parameters = [{'n_neighbors': [5, 15, 35, 61], 'algorithm': ['ball_tree', 'kd_tree', 'brute'],
                          'p':[1, 2, 3], 'weights':['distance', 'uniform'] }]
@@ -207,6 +208,7 @@ def get_best_model_params(model, data, labels, model_type='b', train_test_cutoff
   train, x_test, test, y_test = get_data_sets(data, labels, train_test_cutoff)
   hyper_parameters = get_hyper_parameters(model_type)
   clf = gs(model, hyper_parameters)
+  
   if model_type == 'gmm':
     clf = model
     clf.fit(train)
